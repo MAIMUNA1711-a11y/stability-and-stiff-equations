@@ -1,0 +1,3104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stiff ODEs & Numerical Stability — Interactive Visualization</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #040d1a;
+  --bg2: #07142a;
+  --bg3: #0c1e3d;
+  --navy: #0a1628;
+  --gold: #f0a500;
+  --gold2: #ffd060;
+  --teal: #00d4b8;
+  --red: #ff4d6d;
+  --green: #2ecc71;
+  --purple: #a78bfa;
+  --blue: #60a5fa;
+  --muted: #7a8fa8;
+  --text: #c8d8e8;
+  --white: #f0f6ff;
+  --border: #1a3055;
+  --card: #081526;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── BACKGROUND PARTICLES ── */
+#bg-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.4;
+}
+
+/* ── HERO ── */
+.hero {
+  position: relative;
+  z-index: 1;
+  padding: 100px 40px 70px;
+  text-align: center;
+  background: radial-gradient(ellipse 90% 70% at 50% 0%, rgba(240,165,0,0.08) 0%, transparent 65%),
+              radial-gradient(ellipse 60% 40% at 20% 50%, rgba(0,212,184,0.05) 0%, transparent 60%);
+}
+
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(240,165,0,0.1);
+  border: 1px solid rgba(240,165,0,0.3);
+  color: var(--gold);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  padding: 7px 20px;
+  border-radius: 100px;
+  margin-bottom: 28px;
+}
+
+.hero h1 {
+  font-family: 'Crimson Pro', serif;
+  font-size: clamp(44px, 7vw, 88px);
+  color: var(--white);
+  line-height: 1.05;
+  margin-bottom: 20px;
+  letter-spacing: -1px;
+}
+
+.hero h1 em {
+  font-style: italic;
+  color: var(--gold);
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero-sub {
+  font-size: 15px;
+  color: var(--muted);
+  max-width: 580px;
+  margin: 0 auto 50px;
+  line-height: 1.7;
+}
+
+.hero-pills {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 60px;
+}
+
+.pill {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  color: var(--teal);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  padding: 7px 18px;
+  border-radius: 100px;
+  transition: all .2s;
+}
+
+.pill:hover {
+  background: rgba(0,212,184,0.08);
+  border-color: var(--teal);
+}
+
+/* ── STICKY NAV ── */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(4,13,26,0.95);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.nav::-webkit-scrollbar { display: none; }
+
+.nav-btn {
+  flex-shrink: 0;
+  padding: 16px 24px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+}
+
+.nav-btn:hover { color: var(--text); }
+.nav-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+/* ── LAYOUT ── */
+.page { position: relative; z-index: 1; }
+
+section {
+  display: none;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 70px 40px;
+  animation: fadeUp .4s ease;
+}
+
+section.active { display: block; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── SECTION HEADER ── */
+.sec-head {
+  margin-bottom: 44px;
+}
+
+.sec-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 12px;
+  opacity: 0.8;
+}
+
+.sec-title {
+  font-family: 'Crimson Pro', serif;
+  font-size: clamp(28px, 4vw, 46px);
+  color: var(--white);
+  line-height: 1.15;
+  margin-bottom: 14px;
+}
+
+.sec-title em { font-style: italic; color: var(--gold); }
+
+.sec-desc {
+  font-size: 15px;
+  color: var(--muted);
+  line-height: 1.75;
+  max-width: 680px;
+}
+
+/* ── FORMULA BOX ── */
+.formula {
+  background: linear-gradient(135deg, rgba(240,165,0,0.06), rgba(0,212,184,0.04));
+  border: 1px solid rgba(240,165,0,0.25);
+  border-left: 3px solid var(--gold);
+  border-radius: 0 10px 10px 0;
+  padding: 18px 24px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  color: var(--gold2);
+  line-height: 1.8;
+  margin: 20px 0;
+  letter-spacing: 0.3px;
+}
+
+.formula .dim { color: var(--muted); font-size: 12px; }
+
+/* ── CANVAS PLOT ── */
+.plot-wrap {
+  background: #030b18;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 4px;
+  margin-bottom: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.plot-wrap canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+}
+
+.plot-title {
+  position: absolute;
+  top: 14px;
+  left: 18px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* ── CONTROLS ── */
+.controls {
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin-bottom: 22px;
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.cg { display: flex; align-items: center; gap: 10px; }
+
+.cg label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--muted);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.cg input[type=range] {
+  width: 130px;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
+.val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--gold);
+  background: rgba(240,165,0,0.1);
+  border: 1px solid rgba(240,165,0,0.2);
+  padding: 4px 12px;
+  border-radius: 6px;
+  min-width: 65px;
+  text-align: center;
+}
+
+.btn {
+  background: var(--gold);
+  color: var(--navy);
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.btn:hover { background: var(--gold2); transform: translateY(-1px); box-shadow: 0 4px 20px rgba(240,165,0,0.3); }
+
+.btn-teal {
+  background: var(--teal);
+  color: var(--navy);
+}
+
+.btn-teal:hover { background: #00ffe8; box-shadow: 0 4px 20px rgba(0,212,184,0.3); }
+
+/* ── STATUS ── */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+.status.stable   { background: rgba(46,204,113,0.1); border: 1px solid var(--green); color: var(--green); }
+.status.unstable { background: rgba(255,77,109,0.1); border: 1px solid var(--red);   color: var(--red); }
+.status.marginal { background: rgba(240,165,0,0.1);  border: 1px solid var(--gold);  color: var(--gold); }
+
+/* ── GRID ── */
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+@media(max-width:768px) { .g2, .g3 { grid-template-columns: 1fr; } }
+
+/* ── CARD ── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 26px;
+  margin-bottom: 22px;
+}
+
+.card-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 16px;
+  opacity: 0.85;
+}
+
+/* ── LEGEND ── */
+.legend {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.leg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.leg-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.leg-line {
+  width: 22px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ── TABLE ── */
+table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 16px; }
+th {
+  background: rgba(255,255,255,0.03);
+  color: var(--gold);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+td { padding: 11px 16px; border-bottom: 1px solid rgba(26,48,85,0.5); color: var(--text); }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,0.018); }
+.ok  { color: var(--green); font-weight: 600; }
+.bad { color: var(--red);   font-weight: 600; }
+.warn { color: var(--gold); font-weight: 600; }
+
+/* ── CONCEPT CARDS ── */
+.concept-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+
+.concept-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+}
+
+.concept-card.gold::before { background: var(--gold); }
+.concept-card.teal::before { background: var(--teal); }
+.concept-card.red::before { background: var(--red); }
+.concept-card.purple::before { background: var(--purple); }
+
+.concept-card h3 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+.concept-card.gold h3 { color: var(--gold); }
+.concept-card.teal h3 { color: var(--teal); }
+.concept-card.red h3 { color: var(--red); }
+.concept-card.purple h3 { color: var(--purple); }
+
+.concept-card p { font-size: 14px; color: var(--muted); line-height: 1.65; }
+
+.big-formula {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  text-align: center;
+  padding: 16px;
+  margin: 12px 0;
+  border-radius: 8px;
+}
+
+.big-formula.gold { color: var(--gold); background: rgba(240,165,0,0.06); }
+.big-formula.teal { color: var(--teal); background: rgba(0,212,184,0.06); }
+.big-formula.red  { color: var(--red);  background: rgba(255,77,109,0.06); }
+.big-formula.purple { color: var(--purple); background: rgba(167,139,250,0.06); }
+
+/* ── AMPLIFICATION VISUAL ── */
+.amp-track {
+  height: 8px;
+  background: var(--border);
+  border-radius: 10px;
+  margin: 8px 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.amp-bar {
+  height: 100%;
+  border-radius: 10px;
+  transition: width .4s ease, background .4s;
+}
+
+/* ── ANIMATED STEP INDICATOR ── */
+.step-indicator {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: all .3s;
+}
+
+.step-dot.active { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+.step-dot.done   { background: var(--teal); }
+
+/* ── ANNOTATION ── */
+.annotation {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 8px;
+  letter-spacing: 0.5px;
+}
+
+/* ── SLIDER PAIR ── */
+.slider-pair {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.slider-pair label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  width: 80px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.slider-pair input[type=range] {
+  flex: 1;
+  accent-color: var(--teal);
+}
+
+.slider-pair .val-out {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--teal);
+  min-width: 55px;
+  text-align: center;
+  background: rgba(0,212,184,0.08);
+  border: 1px solid rgba(0,212,184,0.2);
+  padding: 3px 8px;
+  border-radius: 5px;
+}
+
+/* ── TABS within section ── */
+.inner-tabs {
+  display: flex;
+  gap: 4px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  width: fit-content;
+  margin-bottom: 24px;
+}
+
+.inner-tab {
+  padding: 8px 20px;
+  border-radius: 7px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: all .2s;
+  letter-spacing: 0.5px;
+}
+
+.inner-tab.active {
+  background: var(--gold);
+  color: var(--navy);
+  font-weight: 600;
+}
+
+/* ── TOOLTIP ── */
+.tooltip {
+  position: absolute;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text);
+  pointer-events: none;
+  z-index: 999;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  display: none;
+}
+
+/* ── FOOTER ── */
+footer {
+  text-align: center;
+  padding: 50px 40px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── PULSE ANIM ── */
+@keyframes glow {
+  0%,100% { box-shadow: 0 0 6px currentColor; }
+  50% { box-shadow: 0 0 20px currentColor; }
+}
+
+.glowing { animation: glow 2s ease infinite; }
+
+/* ── ANIMATED TEXT ── */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.count-anim { animation: countUp .4s ease; }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-eyebrow">
+    <span style="width:6px;height:6px;background:var(--green);border-radius:50%;animation:glow 1.5s infinite;color:var(--green)"></span>
+    Interactive Lecture Visualization · Numerical Methods
+  </div>
+  <h1>Stiff ODEs &<br><em>Numerical Stability</em></h1>
+  <p class="hero-sub">
+    A deep conceptual exploration of why some differential equations break numerical solvers —
+    and how stability regions govern the choice between explicit and implicit methods.
+  </p>
+  <div class="hero-pills">
+    <span class="pill">dy/dt = λy</span>
+    <span class="pill">|1 + hλ| &lt; 1</span>
+    <span class="pill">A-Stability</span>
+    <span class="pill">Amplification Factor</span>
+    <span class="pill">RK2 · RK4</span>
+    <span class="pill">Stiffness Ratio</span>
+  </div>
+  <div style="margin-top:24px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">
+    <a href="solutions.html" style="display:inline-flex;align-items:center;gap:9px;background:rgba(167,139,250,0.15);border:1px solid rgba(167,139,250,0.45);color:var(--purple);font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;letter-spacing:0.5px;padding:11px 24px;border-radius:100px;text-decoration:none;transition:all .22s;" onmouseover="this.style.background='rgba(167,139,250,0.28)';this.style.transform='translateY(-2px)'" onmouseout="this.style.background='rgba(167,139,250,0.15)';this.style.transform=''">
+      🐍 Python Code &amp; Step-by-Step Solutions →
+    </a>
+    <span style="display:inline-flex;align-items:center;gap:8px;background:rgba(0,212,184,0.08);border:1px solid rgba(0,212,184,0.25);color:var(--teal);font-family:'JetBrains Mono',monospace;font-size:11px;padding:11px 20px;border-radius:100px;">
+      <span style="width:6px;height:6px;background:var(--teal);border-radius:50%;animation:glow 2s infinite;"></span>
+      Requirement No. 5 &amp; 6 — Both Complete
+    </span>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav class="nav">
+  <button class="nav-btn active" onclick="showSection('s1')">① What is Stiffness?</button>
+  <button class="nav-btn" onclick="showSection('s2')">② Amplification Factor</button>
+  <button class="nav-btn" onclick="showSection('s3')">③ Stability Regions</button>
+  <button class="nav-btn" onclick="showSection('s4')">④ Forward Euler — Instability</button>
+  <button class="nav-btn" onclick="showSection('s5')">⑤ Backward Euler — A-Stability</button>
+  <button class="nav-btn" onclick="showSection('s6')">⑥ RK2 vs RK4</button>
+  <button class="nav-btn" onclick="showSection('s7')">⑦ Method Comparison</button>
+  <button class="nav-btn" onclick="showSection('s8')">⑧ Practice Example</button>
+  <button class="nav-btn" onclick="showSection('s9')">⑨ Limitations & Fix</button>
+  <a class="nav-btn" href="solutions.html" style="text-decoration:none;display:flex;align-items:center;gap:6px;margin-left:auto;color:var(--teal);border-left:1px solid var(--border);padding-left:24px;">
+    🐍 Python Code &amp; Graphs →
+  </a>
+</nav>
+
+<div class="page">
+
+<!-- ═══════════════════════════════════
+     SECTION 1 — WHAT IS STIFFNESS?
+════════════════════════════════════ -->
+<section id="s1" class="active">
+  <div class="sec-head">
+    <div class="sec-label">Concept 01</div>
+    <div class="sec-title">What Makes an ODE <em>Stiff?</em></div>
+    <p class="sec-desc">
+      Stiffness occurs when an ODE contains timescales that differ by orders of magnitude.
+      The fast component dies out quickly but forces a tiny step size on explicit methods —
+      even when we only care about the slow component.
+      All stability theory is developed using <strong style="color:var(--gold)">dy/dt = λy</strong>. This test equation captures the essential behavior of stiff systems through its eigenvalue λ.
+    </p>
+  </div>
+
+  <!-- ── CONNECTION TO TEST EQUATION ── -->
+  <div style="background:linear-gradient(135deg,rgba(240,165,0,0.07),rgba(0,212,184,0.05));border:1px solid rgba(240,165,0,0.3);border-radius:14px;padding:26px 28px;margin-bottom:28px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:16px;opacity:.9;">FOUNDATION — THE TEST EQUATION</div>
+    <div class="g2" style="gap:28px;">
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:15px;color:var(--gold2);margin-bottom:12px;">dy/dt = λy &nbsp;→&nbsp; y(t) = y₀ · e<sup>λt</sup></div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.8;">
+          This simple test equation is the <strong style="color:var(--white)">foundation of all stability analysis</strong>. Its exact solution is y(t) = y₀ · e<sup>λt</sup>.<br><br>
+          When <strong style="color:var(--teal)">Re(λ) &lt; 0</strong> — the solution decays exponentially toward <strong style="color:var(--teal)">zero</strong>. A good numerical method must preserve this decay.
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="background:rgba(46,204,113,0.08);border:1px solid rgba(46,204,113,0.3);border-radius:8px;padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;">
+          <span style="color:var(--green)">Re(λ) &lt; 0</span> &nbsp;→&nbsp; y(t) → <strong style="color:var(--green)">0</strong> as t → ∞ &nbsp;(decays ✓)
+        </div>
+        <div style="background:rgba(255,77,109,0.08);border:1px solid rgba(255,77,109,0.3);border-radius:8px;padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;">
+          <span style="color:var(--red)">Re(λ) &gt; 0</span> &nbsp;→&nbsp; y(t) → <strong style="color:var(--red)">∞</strong> as t → ∞ &nbsp;(unstable ✗)
+        </div>
+        <div style="background:rgba(240,165,0,0.08);border:1px solid rgba(240,165,0,0.3);border-radius:8px;padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;">
+          <span style="color:var(--gold)">Re(λ) = 0</span> &nbsp;→&nbsp; oscillatory, marginally stable
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:18px;padding-top:16px;border-top:1px solid rgba(240,165,0,0.2);font-size:13px;color:var(--muted);line-height:1.7;">
+      👉 <strong style="color:var(--white)">The stiff example below uses Slide 15's equation</strong>, where λ₁ = −1000 (fast) and λ₂ = −1 (slow) create a stiffness ratio of 1000 — forcing the numerical method to respect <code style="color:var(--gold)">h &lt; 2/|λ_max|</code>.
+    </div>
+  </div>
+
+  <!-- ── KEY INSIGHT BOX ── -->
+  <div style="background:rgba(167,139,250,0.07);border:1px solid rgba(167,139,250,0.35);border-left:3px solid var(--purple);border-radius:0 12px 12px 0;padding:18px 24px;margin-bottom:28px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--purple);margin-bottom:10px;opacity:.9;">KEY INSIGHT</div>
+    <div style="font-size:14px;color:var(--text);line-height:1.75;">
+      <strong style="color:var(--purple)">Stiffness is NOT about fast change alone.</strong> It is about the <em>stability restrictions imposed by fast-decaying components</em>, even when the actual solution of interest changes slowly. The numerical method is forced to take tiny steps — not for accuracy, but purely for stability.
+    </div>
+  </div>
+
+  <div class="g2" style="margin-bottom:28px;">
+    <div class="concept-card gold">
+      <h3>The Stiff ODE Example</h3>
+      <div class="big-formula gold">dy/dt = −1000y + 1000e⁻ᵗ</div>
+      <p>Exact solution: <code style="color:var(--gold2)">y(t) = e⁻ᵗ − e⁻¹⁰⁰⁰ᵗ</code> &nbsp;(with y(0) = 0)<br><br>
+      Two timescales: λ₁ = −1000 (fast) and λ₂ = −1 (slow). The fast term e⁻¹⁰⁰⁰ᵗ vanishes almost instantly, but any explicit method must step as if it persists forever.</p>
+      <!-- Explanation -->
+      <div style="margin-top:14px;background:rgba(0,212,184,0.06);border:1px solid rgba(0,212,184,0.25);border-radius:8px;padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7;">
+        <strong style="color:var(--teal);">Fast component:</strong> −1000y &nbsp;(decays very quickly, eigenvalue λ₁ ≈ −1000)<br>
+        <strong style="color:var(--teal);">Slow component:</strong> 1000e⁻ᵗ &nbsp;(changes slowly, eigenvalue λ₂ ≈ −1)<br>
+        Stiffness ratio ≈ 1000 → stiff problem requiring implicit methods.
+      </div>
+    </div>
+    <div class="concept-card teal">
+      <h3>Stiffness Ratio</h3>
+      <div class="big-formula teal">S = |λ_max / λ_min| = 1000/1 = 1000</div>
+      <p>The stiffness ratio measures how separated the eigenvalues are. For Forward Euler, stability requires <code style="color:var(--teal)">h &lt; 2/|λ_max| = 0.002</code>.<br><br>
+      To simulate to t = 1, we need <strong style="color:var(--teal)">≥ 500 steps</strong> — just to track a solution that changes slowly!</p>
+      <!-- Numerical example from slides -->
+      <div style="margin-top:14px;background:rgba(0,212,184,0.06);border:1px solid rgba(0,212,184,0.2);border-radius:8px;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.85;color:var(--teal);">
+        <div style="color:var(--muted);font-size:11px;margin-bottom:6px;">SLIDE EXAMPLE: λ=−50, h=0.1 → z=−5</div>
+        FE: R(z) = 1+(−5) = −4, |R|=<strong style="color:var(--red)">4 → unstable ✗</strong><br>
+        BE: R(z) = 1/(1−(−5)) = 1/6, |R|=<strong style="color:var(--green)">0.167 → stable ✓</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Animated stiff ODE canvas -->
+  <div class="card">
+    <div class="card-label">Live Simulation — Fast Transient vs Slow Behavior</div>
+
+    <div class="controls">
+      <div class="cg">
+        <label>View:</label>
+        <div class="inner-tabs" style="margin:0">
+          <button class="inner-tab active" id="stiff_fast_btn" onclick="setStiffView('fast')">Fast (t≈0)</button>
+          <button class="inner-tab" id="stiff_slow_btn" onclick="setStiffView('slow')">Slow (t=0–10)</button>
+        </div>
+      </div>
+      <div class="cg">
+        <label>λ_fast:</label>
+        <input type="range" id="stiff_lam" min="-2000" max="-100" step="50" value="-1000">
+        <span class="val" id="stiff_lam_d">-1000</span>
+      </div>
+      <button class="btn" onclick="drawStiffPlot()">▶ Update</button>
+    </div>
+
+    <div class="g2">
+      <div>
+        <div class="plot-wrap">
+          <canvas id="stiffC1" width="520" height="360"></canvas>
+          <div class="plot-title">FAST TRANSIENT DECAY</div>
+        </div>
+        <div class="annotation">e^(λ_fast · t) decays instantly — but forces h &lt; 2/|λ_max| on ALL explicit methods</div>
+      </div>
+      <div>
+        <div class="plot-wrap">
+          <canvas id="stiffC2" width="520" height="360"></canvas>
+          <div class="plot-title">SLOW COMPONENT</div>
+        </div>
+        <div class="annotation">Solution: y = e⁻ᵗ − e⁻¹⁰⁰⁰ᵗ → slow component e⁻ᵗ dominates as fast term vanishes</div>
+      </div>
+    </div>
+
+    <div class="g3" style="margin-top:20px;">
+      <div style="background:rgba(255,77,109,0.06);border:1px solid rgba(255,77,109,0.2);border-radius:10px;padding:18px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--red);margin-bottom:8px;">FAST EIGENVALUE</div>
+        <div style="font-size:26px;font-family:'Crimson Pro',serif;color:var(--red);" id="fast_lam_disp">λ₁ = −1000</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:6px;">h_max = 0.002</div>
+      </div>
+      <div style="background:rgba(0,212,184,0.06);border:1px solid rgba(0,212,184,0.2);border-radius:10px;padding:18px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--teal);margin-bottom:8px;">SLOW EIGENVALUE</div>
+        <div style="font-size:26px;font-family:'Crimson Pro',serif;color:var(--teal);">λ₂ = −1</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:6px;">h_max = 2.000</div>
+      </div>
+      <div style="background:rgba(240,165,0,0.06);border:1px solid rgba(240,165,0,0.2);border-radius:10px;padding:18px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--gold);margin-bottom:8px;">STIFFNESS RATIO</div>
+        <div style="font-size:26px;font-family:'Crimson Pro',serif;color:var(--gold);" id="stiff_ratio_disp">S = 1000</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:6px;" id="stiff_steps_disp">Need ≥ 500 steps to t=1</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;font-family:'JetBrains Mono',monospace;">driven by λ_max, not accuracy</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════
+     SECTION 2 — AMPLIFICATION FACTOR
+════════════════════════════════════ -->
+<section id="s2">
+  <div class="sec-head">
+    <div class="sec-label">Concept 02</div>
+    <div class="sec-title">The <em>Amplification Factor</em></div>
+    <p class="sec-desc">
+      For the test equation <strong style="color:var(--gold)">dy/dt = λy</strong>, the exact solution decays as e<sup>λt</sup> (Re(λ)&lt;0).
+      The amplification factor R(z) tells us how much each numerical step multiplies the solution.
+      Stability demands |R(z)| &lt; 1 at every step — so that the numerical solution also decays, matching the exact behavior.
+      This single number predicts stability or explosion.
+    </p>
+  </div>
+
+  <div class="g2" style="margin-bottom:28px;">
+    <div class="concept-card gold">
+      <h3>Forward Euler</h3>
+      <div class="big-formula gold">R(z) = 1 + z</div>
+      <p>where <code style="color:var(--gold2)">z = hλ</code>. After n steps, <code style="color:var(--gold2)">yₙ = R(z)ⁿ · y₀</code>.<br><br>
+      Stability ⟺ <code>|R(z)| = |1 + hλ| &lt; 1</code><br>
+      This traces a circle of radius 1 centered at z = −1.</p>
+    </div>
+    <div class="concept-card teal">
+      <h3>Backward Euler</h3>
+      <div class="big-formula teal">R(z) = 1/(1 − z)</div>
+      <p>For Re(z) &lt; 0, we have |R(z)| &lt; 1 always.<br><br>
+      The entire left half-plane is stable — any step size works for any λ with Re(λ) &lt; 0.<br>
+      This is <strong style="color:var(--teal)">A-stability</strong>.</p>
+      <div style="margin-top:14px;background:rgba(0,212,184,0.07);border:1px solid rgba(0,212,184,0.25);border-radius:8px;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.85;color:var(--teal);">
+        <div style="color:var(--muted);font-size:10px;letter-spacing:1.5px;margin-bottom:6px;">SLIDE EXAMPLE · λ=−50, h=0.1 → z=−5</div>
+        BE: R(z) = 1/(1−(−5)) = <strong>1/6 ≈ 0.167</strong><br>
+        |R(z)| = 0.167 &lt; 1 &nbsp;<strong style="color:var(--green)">→ STABLE ✓</strong><br>
+        <span style="color:var(--muted);font-size:11px;">(vs FE: |R|=4 → UNSTABLE at same h)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive amplification explorer -->
+  <div class="card">
+    <div class="card-label">Amplification Factor Explorer — |R(z)| visualized</div>
+
+    <div class="controls">
+      <div class="cg">
+        <label>λ (real):</label>
+        <input type="range" id="amp_lam" min="-10" max="-0.5" step="0.5" value="-3">
+        <span class="val" id="amp_lam_d">-3.0</span>
+      </div>
+      <div class="cg">
+        <label>h (step size):</label>
+        <input type="range" id="amp_h" min="0.05" max="1.5" step="0.05" value="0.3">
+        <span class="val" id="amp_h_d">0.30</span>
+      </div>
+      <div class="cg">
+        <label>Method:</label>
+        <div class="inner-tabs" style="margin:0">
+          <button class="inner-tab active" id="amp_fe_btn" onclick="setAmpMethod('fe')">Forward Euler</button>
+          <button class="inner-tab" id="amp_be_btn" onclick="setAmpMethod('be')">Backward Euler</button>
+          <button class="inner-tab" id="amp_rk4_btn" onclick="setAmpMethod('rk4')">RK4</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="amp_status" class="status stable">✓ STABLE — |R(z)| &lt; 1</div>
+
+    <div class="g2">
+      <div>
+        <div class="plot-wrap">
+          <canvas id="ampCanvas" width="520" height="360"></canvas>
+          <div class="plot-title">SOLUTION GROWTH / DECAY</div>
+        </div>
+        <div class="legend">
+          <div class="leg"><div class="leg-line" style="background:var(--teal);border-top:2px dashed var(--teal);background:none;border-bottom:none;border-left:none;border-right:none;width:20px;height:0;margin:6px 0"></div>Exact e^(λt)</div>
+          <div class="leg"><div class="leg-dot" style="background:var(--gold)"></div>Numerical</div>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="margin:0">
+          <div class="card-label">|R(z)| meter</div>
+          <div style="margin-bottom:20px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted)">z = hλ =</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--gold)" id="z_val_disp">−0.90</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted)">|R(z)| =</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:13px;" id="Rz_val_disp">0.10</span>
+            </div>
+            <div class="amp-track" style="margin-top:14px;">
+              <div class="amp-bar" id="amp_bar" style="width:10%;background:var(--green)"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-top:4px;">
+              <span>0 (perfect decay)</span>
+              <span>1 (boundary)</span>
+              <span>2+ (unstable)</span>
+            </div>
+          </div>
+
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);line-height:1.8;border-top:1px solid var(--border);padding-top:16px;">
+            <div>Stability condition: <span style="color:var(--gold)">|R(z)| &lt; 1</span></div>
+            <div>After n steps: <span style="color:var(--teal)">yₙ = R(z)ⁿ · y₀</span></div>
+            <div id="rz_power_disp" style="margin-top:8px;color:var(--text)">After 10 steps: 0.904^10 ≈ 0.34</div>
+          </div>
+
+          <div style="margin-top:16px;">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--muted);margin-bottom:10px;">STEP EVOLUTION (|R|ⁿ)</div>
+            <canvas id="rzPowerCanvas" width="340" height="120"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════
+     SECTION 3 — STABILITY REGIONS
+════════════════════════════════════ -->
+<section id="s3">
+  <div class="sec-head">
+    <div class="sec-label">Concept 03</div>
+    <div class="sec-title">Stability <em>Regions</em> in the Complex Plane</div>
+    <p class="sec-desc">
+      The stability region is the set of all z = hλ values for which |R(z)| ≤ 1.
+      The shape of this region determines which problems each method can handle safely.
+    </p>
+  </div>
+
+  <div class="formula">
+    A method is <strong style="color:var(--gold2)">A-stable</strong> if its stability region contains
+    the entire left half-plane {z : Re(z) ≤ 0}.
+    This guarantees stability for any step size on any problem with decaying eigenvalues.
+    <br><br>
+    <span class="dim">⚑ Stability theory uses dy/dt = λy as the test equation. The stiffness comes from eigenvalues with large negative real parts (Re(λ) ≪ 0), forcing tiny step sizes on explicit methods — this is the <em>stability restriction</em>, not an accuracy requirement.</span>
+  </div>
+
+  <div class="controls">
+    <div class="cg">
+      <label>Show methods:</label>
+      <div class="inner-tabs" style="margin:0">
+        <button class="inner-tab active" id="reg_all_btn" onclick="setRegionView('all')">All Methods</button>
+        <button class="inner-tab" id="reg_euler_btn" onclick="setRegionView('euler')">Euler Only</button>
+        <button class="inner-tab" id="reg_rk_btn" onclick="setRegionView('rk')">RK Methods</button>
+      </div>
+    </div>
+    <div class="cg">
+      <label>λ (real):</label>
+      <input type="range" id="reg_lam" min="-4" max="-0.2" step="0.1" value="-1.5">
+      <span class="val" id="reg_lam_d">-1.5</span>
+    </div>
+    <div class="cg">
+      <label>h:</label>
+      <input type="range" id="reg_h" min="0.1" max="3.0" step="0.05" value="0.8">
+      <span class="val" id="reg_h_d">0.80</span>
+    </div>
+    <button class="btn" onclick="drawRegionPlot()">▶ Update</button>
+  </div>
+
+  <div class="g2">
+    <div>
+      <div class="plot-wrap">
+        <canvas id="regionCanvas" width="520" height="520"></canvas>
+        <div class="plot-title">STABILITY REGIONS — COMPLEX PLANE (z = hλ)</div>
+      </div>
+      <div class="legend">
+        <div class="leg"><div class="leg-dot" style="background:var(--teal);opacity:.7;width:14px;height:14px;border-radius:3px"></div>Forward Euler</div>
+        <div class="leg"><div class="leg-dot" style="background:var(--gold);opacity:.4;width:14px;height:14px;border-radius:3px"></div>Implicit Euler (A-stable)</div>
+        <div class="leg"><div class="leg-dot" style="background:var(--purple);opacity:.5;width:14px;height:14px;border-radius:3px"></div>RK4</div>
+        <div class="leg"><div class="leg-dot" style="background:var(--red);width:10px;height:10px"></div>Current hλ</div>
+      </div>
+    </div>
+    <div>
+      <div class="g2" style="margin-bottom:16px;">
+        <div class="concept-card teal" style="margin:0">
+          <h3>Explicit Euler</h3>
+          <div class="big-formula teal" style="font-size:14px;">|1 + z| ≤ 1</div>
+          <p style="font-size:13px;">Circle of radius 1 centered at (−1, 0) in the z-plane. Limited to a small region — catastrophic for stiff ODEs.</p>
+        </div>
+        <div class="concept-card gold" style="margin:0">
+          <h3>Implicit Euler</h3>
+          <div class="big-formula gold" style="font-size:14px;">Re(z) ≤ 0</div>
+          <p style="font-size:13px;">Entire left half-plane. <strong style="color:var(--gold)">A-stable</strong> — any step size is fine as long as Re(λ) &lt; 0.</p>
+        </div>
+      </div>
+      <div class="concept-card purple" style="margin-bottom:16px;">
+        <h3>RK4 Stability</h3>
+        <div class="big-formula purple" style="font-size:13px;">|1 + z + z²/2 + z³/6 + z⁴/24| ≤ 1</div>
+        <p style="font-size:13px;">Much larger than Forward Euler — extends to about Re(z) ≈ −2.8 on the real axis. But still bounded, so not A-stable.</p>
+      </div>
+
+      <div class="card" style="margin:0">
+        <div class="card-label">Stability Region Sizes (real axis)</div>
+        <table>
+          <tr><th>Method</th><th>|hλ| limit</th><th>A-stable?</th></tr>
+          <tr><td>Explicit Euler</td><td class="bad">|hλ| ≤ 2</td><td class="bad">✗</td></tr>
+          <tr><td>RK2 (midpoint)</td><td class="warn">|hλ| ≤ 2</td><td class="bad">✗</td></tr>
+          <tr><td>RK4</td><td class="warn">|hλ| ≤ 2.79</td><td class="bad">✗</td></tr>
+          <tr><td>Implicit Euler</td><td class="ok">∞ (all Re(λ)&lt;0)</td><td class="ok">✓</td></tr>
+          <tr><td>Trapezoidal</td><td class="ok">∞ (all Re(λ)&lt;0)</td><td class="ok">✓</td></tr>
+          <tr><td>BDF / Radau</td><td class="ok">∞</td><td class="ok">✓</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════
+     SECTION 4 — FORWARD EULER INSTABILITY
+════════════════════════════════════ -->
+<section id="s4">
+  <div class="sec-head">
+    <div class="sec-label">Concept 04</div>
+    <div class="sec-title">Forward Euler — <em>Instability Visualized</em></div>
+    <p class="sec-desc">
+      Forward Euler is simple but fragile. When h is too large relative to λ, the amplification
+      factor |1 + hλ| exceeds 1 — and errors grow exponentially instead of decaying.
+    </p>
+  </div>
+
+  <div class="formula">
+    Forward Euler: &nbsp;yₙ₊₁ = yₙ + h·f(tₙ, yₙ) &nbsp;&nbsp;⟹&nbsp;&nbsp; yₙ = (1 + hλ)ⁿ · y₀
+    <br><span class="dim">Stable only when h &lt; 2/|λ|. Critical threshold is a hard boundary.</span>
+  </div>
+
+  <!-- Slide-consistent numerical example block -->
+  <div style="background:rgba(255,77,109,0.06);border:1px solid rgba(255,77,109,0.3);border-radius:12px;padding:22px 26px;margin-bottom:24px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--red);margin-bottom:14px;opacity:.9;">SLIDE NUMERICAL EXAMPLE · FORWARD EULER vs BACKWARD EULER</div>
+    <div class="g2" style="gap:24px;">
+      <div style="background:rgba(255,77,109,0.07);border:1px solid rgba(255,77,109,0.2);border-radius:8px;padding:16px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--red);margin-bottom:10px;letter-spacing:1px;">FORWARD EULER — UNSTABLE</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);line-height:2;">
+          λ = −50, &nbsp;h = 0.1<br>
+          z = hλ = 0.1×(−50) = <strong style="color:var(--gold)">−5</strong><br>
+          R(z) = 1 + z = 1 + (−5) = <strong style="color:var(--red)">−4</strong><br>
+          |R(z)| = <strong style="color:var(--red)">4 &gt; 1 &nbsp;→ UNSTABLE ✗</strong>
+        </div>
+        <div style="margin-top:10px;font-size:12px;color:var(--muted);">Each step multiplies by −4: 1 → −4 → 16 → −64 → 256…</div>
+      </div>
+      <div style="background:rgba(46,204,113,0.07);border:1px solid rgba(46,204,113,0.2);border-radius:8px;padding:16px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--green);margin-bottom:10px;letter-spacing:1px;">BACKWARD EULER — STABLE</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);line-height:2;">
+          Same λ = −50, &nbsp;h = 0.1, &nbsp;z = −5<br>
+          R(z) = 1/(1 − (−5)) = 1/6<br>
+          |R(z)| = <strong style="color:var(--green)">0.167 &lt; 1 &nbsp;→ STABLE ✓</strong>
+        </div>
+        <div style="margin-top:10px;font-size:12px;color:var(--muted);">Each step multiplies by 1/6 → solution decays correctly.</div>
+      </div>
+    </div>
+    <div style="margin-top:14px;font-size:13px;color:var(--muted);font-family:'JetBrains Mono',monospace;">
+      h_critical for FE = 2/|λ| = 2/50 = <strong style="color:var(--gold)">0.04</strong> &nbsp;|&nbsp; h = 0.1 &gt; 0.04 → instability is expected
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="cg">
+      <label>λ:</label>
+      <input type="range" id="fe_lam" min="-20" max="-0.5" step="0.5" value="-5">
+      <span class="val" id="fe_lam_d">-5.0</span>
+    </div>
+    <div class="cg">
+      <label>h (step):</label>
+      <input type="range" id="fe_h" min="0.02" max="0.6" step="0.005" value="0.15">
+      <span class="val" id="fe_h_d">0.150</span>
+    </div>
+    <div class="cg">
+      <label>Steps:</label>
+      <input type="range" id="fe_steps" min="10" max="80" step="5" value="30">
+      <span class="val" id="fe_steps_d">30</span>
+    </div>
+    <button class="btn" onclick="drawFwdEuler()">▶ Run</button>
+  </div>
+
+  <div id="fe_status" class="status stable">✓ STABLE</div>
+
+  <div class="plot-wrap">
+    <canvas id="feCanvas" width="1060" height="400"></canvas>
+    <div class="plot-title">FORWARD EULER vs EXACT SOLUTION</div>
+  </div>
+
+  <div class="legend" style="margin-bottom:24px;">
+    <div class="leg"><div class="leg-line" style="background:var(--teal);height:2px;border-top:2px dashed var(--teal);background:none;width:22px"></div>Exact y = eˡᵗ</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--gold)"></div>Forward Euler steps</div>
+  </div>
+
+  <!-- Error growth visualization -->
+  <div class="g2">
+    <div class="card">
+      <div class="card-label">Error Growth per Step</div>
+      <canvas id="feErrorCanvas" width="460" height="200"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-label">Why Does It Blow Up?</div>
+      <div style="font-size:14px;color:var(--muted);line-height:1.75;">
+        <p>At each step the error is multiplied by <code style="color:var(--gold)">(1 + hλ)</code>.</p>
+        <div class="formula" style="margin:12px 0;font-size:13px;">
+          If |1 + hλ| > 1 → errors <span style="color:var(--red)">grow exponentially</span><br>
+          If |1 + hλ| = 1 → errors <span style="color:var(--gold)">stay constant</span><br>
+          If |1 + hλ| &lt; 1 → errors <span style="color:var(--green)">decay to zero</span>
+        </div>
+        <p>For λ = −5, stability requires h &lt; 2/5 = <strong style="color:var(--gold)">0.400</strong>.</p>
+        <div id="fe_analysis" style="margin-top:12px;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:2;">
+          Loading...
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════
+     SECTION 5 — BACKWARD EULER A-STABILITY
+════════════════════════════════════ -->
+<section id="s5">
+  <div class="sec-head">
+    <div class="sec-label">Concept 05</div>
+    <div class="sec-title">Backward Euler — <em>A-Stability</em></div>
+    <p class="sec-desc">
+      Backward Euler evaluates the derivative at the next time point (implicitly).
+      This simple change makes it unconditionally stable for any step size — but requires
+      solving an equation at each step. Applied to the test equation dy/dt = λy, it gives
+      R(z) = 1/(1−z), which satisfies |R(z)| &lt; 1 for <em>all</em> Re(z) &lt; 0 regardless of h.
+    </p>
+  </div>
+
+  <div class="g2" style="margin-bottom:28px;">
+    <div class="formula" style="flex:1">
+      <strong>Forward Euler:</strong>&nbsp; yₙ₊₁ = yₙ + h·f(tₙ, yₙ)<br>
+      <span style="color:var(--teal)">↳ Explicit: use current values</span>
+    </div>
+    <div class="formula" style="flex:1;border-left-color:var(--teal)">
+      <strong>Backward Euler:</strong>&nbsp; yₙ₊₁ = yₙ + h·f(tₙ₊₁, yₙ₊₁)<br>
+      <span style="color:var(--teal)">↳ Implicit: solve for unknown yₙ₊₁</span>
+    </div>
+  </div>
+
+  <div class="formula">
+    For dy/dt = λy: &nbsp;&nbsp; yₙ₊₁ = yₙ/(1 − hλ) &nbsp;&nbsp;⟹&nbsp;&nbsp; |R(z)| = |1/(1−z)|
+    <br><span class="dim">For Re(λ) &lt; 0 and any h > 0: |1/(1−hλ)| &lt; 1 always. ∴ A-stable ✓</span>
+  </div>
+
+  <div class="controls">
+    <div class="cg">
+      <label>λ:</label>
+      <input type="range" id="be_lam" min="-50" max="-0.5" step="0.5" value="-20">
+      <span class="val" id="be_lam_d">-20.0</span>
+    </div>
+    <div class="cg">
+      <label>h (step):</label>
+      <input type="range" id="be_h" min="0.02" max="1.0" step="0.01" value="0.2">
+      <span class="val" id="be_h_d">0.200</span>
+    </div>
+    <div class="cg">
+      <label>Steps:</label>
+      <input type="range" id="be_steps" min="10" max="60" step="5" value="25">
+      <span class="val" id="be_steps_d">25</span>
+    </div>
+    <button class="btn btn-teal" onclick="drawBwdEuler()">▶ Run</button>
+  </div>
+
+  <div class="plot-wrap">
+    <canvas id="beCanvas" width="1060" height="400"></canvas>
+    <div class="plot-title">BACKWARD EULER — UNCONDITIONALLY STABLE</div>
+  </div>
+
+  <div class="legend" style="margin-bottom:24px;">
+    <div class="leg"><div class="leg-line" style="background:none;border-top:2px dashed var(--muted);width:22px;height:0;margin:6px 0;"></div>Exact y = eˡᵗ</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--teal)"></div>Backward Euler (A-stable)</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--red);opacity:.6"></div>Forward Euler (unstable for this h)</div>
+  </div>
+
+  <div class="g2">
+    <div class="concept-card teal" style="margin:0">
+      <h3>Why Implicit = A-stable?</h3>
+      <p style="font-size:14px;line-height:1.75;">
+        R(z) = 1/(1 − z). For z = hλ with λ = −a + bi (a > 0):
+        |1 − z|² = (1 + ah)² + (bh)² > 1.
+        So |R(z)| = 1/|1−z| &lt; 1 always.
+        <br><br>
+        No matter how large h is, the implicit method damps the solution.
+        It may be inaccurate, but it will never blow up.
+      </p>
+    </div>
+    <div class="card" style="margin:0">
+      <div class="card-label">Trade-off Summary</div>
+      <table>
+        <tr><th>Property</th><th>Forward Euler</th><th>Backward Euler</th></tr>
+        <tr><td>Stability</td><td class="bad">|hλ| ≤ 2</td><td class="ok">Always stable</td></tr>
+        <tr><td>Accuracy (order)</td><td>O(h)</td><td>O(h)</td></tr>
+        <tr><td>Cost per step</td><td class="ok">1 eval</td><td class="bad">Solve equation</td></tr>
+        <tr><td>For stiff ODEs</td><td class="bad">Impractical</td><td class="ok">Excellent</td></tr>
+        <tr><td>A-stable?</td><td class="bad">✗ No</td><td class="ok">✓ Yes</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════
+     SECTION 6 — RK2 vs RK4
+════════════════════════════════════ -->
+<section id="s6">
+  <div class="sec-head">
+    <div class="sec-label">Concept 06</div>
+    <div class="sec-title">RK2 vs RK4 — <em>Stability Comparison</em></div>
+    <p class="sec-desc">
+      Runge-Kutta methods use multiple stage evaluations to achieve higher accuracy.
+      Higher order also typically means a larger stability region — but they remain explicit,
+      so they cannot be A-stable.
+    </p>
+  </div>
+
+  <div class="g2" style="margin-bottom:28px;">
+    <div class="concept-card purple">
+      <h3>RK2 — Midpoint Method</h3>
+      <div class="big-formula purple" style="font-size:13px;">R(z) = 1 + z + z²/2</div>
+      <p>Uses 2 stage evaluations. Real-axis stability limit: <code style="color:var(--purple)">|hλ| ≤ 2</code> — same as Forward Euler on the real axis, but imaginary axis coverage is better.</p>
+    </div>
+    <div class="concept-card gold">
+      <h3>RK4 — Classical Method</h3>
+      <div class="big-formula gold" style="font-size:13px;">R(z) = 1 + z + z²/2 + z³/6 + z⁴/24</div>
+      <p>Uses 4 stage evaluations. Real-axis stability limit: <code style="color:var(--gold)">|hλ| ≤ 2.79</code>. For accuracy on smooth problems, RK4 is the workhorse of numerical ODE solving.</p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="cg">
+      <label>λ:</label>
+      <input type="range" id="rk_lam" min="-10" max="-0.5" step="0.5" value="-2">
+      <span class="val" id="rk_lam_d">-2.0</span>
+    </div>
+    <div class="cg">
+      <label>h:</label>
+      <input type="range" id="rk_h" min="0.05" max="1.5" step="0.05" value="0.5">
+      <span class="val" id="rk_h_d">0.50</span>
+    </div>
+    <div class="cg">
+      <label>Steps:</label>
+      <input type="range" id="rk_steps" min="10" max="60" step="5" value="20">
+      <span class="val" id="rk_steps_d">20</span>
+    </div>
+    <button class="btn" onclick="drawRK()">▶ Compare</button>
+  </div>
+
+  <div id="rk_status" class="status stable">Current z = hλ status</div>
+
+  <!-- Side-by-side stability regions for RK2 vs RK4 -->
+  <div class="g2" style="margin-bottom:24px;">
+    <div>
+      <div class="plot-wrap">
+        <canvas id="rk2RegionCanvas" width="520" height="400"></canvas>
+        <div class="plot-title">RK2 STABILITY REGION</div>
+      </div>
+      <div class="annotation">|1 + z + z²/2| ≤ 1 — real axis limit: 2.0</div>
+    </div>
+    <div>
+      <div class="plot-wrap">
+        <canvas id="rk4RegionCanvas" width="520" height="400"></canvas>
+        <div class="plot-title">RK4 STABILITY REGION</div>
+      </div>
+      <div class="annotation">|1 + z + z²/2 + z³/6 + z⁴/24| ≤ 1 — real axis limit: 2.79</div>
+    </div>
+  </div>
+
+  <div class="plot-wrap">
+    <canvas id="rkCanvas" width="1060" height="380"></canvas>
+    <div class="plot-title">RK2 vs RK4 vs EXACT SOLUTION</div>
+  </div>
+
+  <div class="legend" style="margin-bottom:24px;">
+    <div class="leg"><div class="leg-line" style="background:none;border-top:2px dashed var(--muted);width:22px;height:0;margin:6px 0"></div>Exact</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--purple)"></div>RK2</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--gold)"></div>RK4</div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">RK Method Comparison</div>
+    <table>
+      <tr><th>Method</th><th>Order</th><th>Stages</th><th>Real Axis Limit</th><th>A-stable?</th><th>Best Use</th></tr>
+      <tr><td>Forward Euler</td><td>1</td><td>1</td><td class="bad">|hλ| ≤ 2.0</td><td class="bad">✗</td><td>Simple demos</td></tr>
+      <tr><td>RK2 (Midpoint)</td><td>2</td><td>2</td><td class="warn">|hλ| ≤ 2.0</td><td class="bad">✗</td><td>Moderate accuracy</td></tr>
+      <tr><td>RK4 (Classical)</td><td>4</td><td>4</td><td class="ok">|hλ| ≤ 2.79</td><td class="bad">✗</td><td>Smooth non-stiff ODEs</td></tr>
+      <tr><td>Implicit Euler</td><td>1</td><td>1</td><td class="ok">∞</td><td class="ok">✓</td><td>Stiff problems</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════
+     SECTION 7 — METHOD COMPARISON
+════════════════════════════════════ -->
+<section id="s7">
+  <div class="sec-head">
+    <div class="sec-label">Concept 07</div>
+    <div class="sec-title">All Methods — <em>Side-by-Side Comparison</em></div>
+    <p class="sec-desc">
+      Watch all four methods simultaneously. Find the critical step size where Forward Euler
+      diverges while Backward Euler continues to track the solution faithfully.
+    </p>
+  </div>
+
+  <div class="controls">
+    <div class="cg">
+      <label>λ:</label>
+      <input type="range" id="all_lam" min="-30" max="-1" step="1" value="-10">
+      <span class="val" id="all_lam_d">-10</span>
+    </div>
+    <div class="cg">
+      <label>h:</label>
+      <input type="range" id="all_h" min="0.01" max="0.5" step="0.005" value="0.15">
+      <span class="val" id="all_h_d">0.150</span>
+    </div>
+    <div class="cg">
+      <label>Steps:</label>
+      <input type="range" id="all_steps" min="10" max="60" step="5" value="30">
+      <span class="val" id="all_steps_d">30</span>
+    </div>
+    <button class="btn" onclick="drawAllMethods()">▶ Compare All</button>
+  </div>
+
+  <!-- Status row for all 4 methods -->
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
+    <div id="all_fe_status"  class="status stable" style="margin:0">FE: ✓</div>
+    <div id="all_be_status"  class="status stable" style="margin:0">BE: ✓</div>
+    <div id="all_rk2_status" class="status stable" style="margin:0">RK2: ✓</div>
+    <div id="all_rk4_status" class="status stable" style="margin:0">RK4: ✓</div>
+  </div>
+
+  <div class="plot-wrap">
+    <canvas id="allCanvas" width="1060" height="440"></canvas>
+    <div class="plot-title">ALL METHODS COMPARISON — dy/dt = λy, y(0) = 1</div>
+  </div>
+
+  <div class="legend" style="margin-bottom:28px;">
+    <div class="leg"><div class="leg-line" style="background:none;border-top:2px dashed var(--muted);width:22px;height:0;margin:6px 0"></div>Exact</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--red)"></div>Forward Euler</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--teal)"></div>Backward Euler</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--purple)"></div>RK2</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--gold)"></div>RK4</div>
+  </div>
+
+  <!-- Error comparison -->
+  <div class="g2">
+    <div class="card">
+      <div class="card-label">Critical Step Size Comparison</div>
+      <div id="all_crit_info" class="formula" style="font-size:13px;"></div>
+      <table>
+        <tr><th>Method</th><th>h_crit</th><th>Your h</th><th>Status</th></tr>
+        <tr><td>Forward Euler</td><td id="fe_crit">—</td><td id="fe_h_curr">—</td><td id="fe_crit_stat">—</td></tr>
+        <tr><td>Backward Euler</td><td>∞ (A-stable)</td><td id="be_h_curr">—</td><td class="ok">✓ Always OK</td></tr>
+        <tr><td>RK2</td><td id="rk2_crit">—</td><td id="rk2_h_curr">—</td><td id="rk2_crit_stat">—</td></tr>
+        <tr><td>RK4</td><td id="rk4_crit">—</td><td id="rk4_h_curr">—</td><td id="rk4_crit_stat">—</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-label">Conceptual Summary</div>
+      <div style="font-size:14px;color:var(--muted);line-height:1.8;">
+        <p>The fundamental insight: <strong style="color:var(--white)">stiff ODEs force a trade-off</strong> between stability and computational cost.</p>
+        <br>
+        <p><span style="color:var(--red)">Explicit methods</span> (FE, RK4) compute derivatives at known points — cheap, but require tiny steps for stiff problems.</p>
+        <br>
+        <p><span style="color:var(--teal)">Implicit methods</span> (BE, BDF) solve a system at each step — expensive, but unconditionally stable, ideal for stiff ODEs.</p>
+        <br>
+        <p>The stability region in the complex plane is the geometric answer to: <em style="color:var(--gold)">"Which values of hλ are safe?"</em></p>
+      </div>
+      <!-- KEEP BOTH INTERPRETATIONS NOTE -->
+      <div style="margin-top:18px;padding:14px 16px;background:rgba(167,139,250,0.07);border:1px solid rgba(167,139,250,0.3);border-radius:9px;font-size:13px;color:var(--muted);line-height:1.75;">
+        <strong style="color:var(--purple);font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:1px;display:block;margin-bottom:8px;">BOTH INTERPRETATIONS</strong>
+        <strong style="color:var(--white)">Test equation dy/dt = λy</strong> → solution decays to <strong style="color:var(--teal)">0</strong>. Used for all stability analysis and theory development.<br><br>
+        <strong style="color:var(--white)">Real stiff systems</strong> (e.g. dy/dt = −1000y + 1000e<sup>−t</sup>) → fast eigenvalue λ₁ = −1000 forces tiny step sizes on explicit methods.<br><br>
+        The stability restriction is <em>always</em> governed by the largest |Re(λ)|. Stiffness is about the step-size penalty imposed by λ_max.
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════
+     S8 — PRACTICE EXAMPLE
+════════════════════════════════════════════════ -->
+<section id="s8">
+  <div class="sec-label">Practice Example</div>
+  <div class="sec-title">Worked Problem — <em>dy/dt = −50y</em></div>
+  <p class="sec-desc">
+    Apply stability theory step-by-step: given λ = −50, h = 0.1, y(0) = 1.
+    Determine whether Forward Euler is stable and trace the numerical solution.
+  </p>
+
+  <!-- Given box -->
+  <div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--purple);border-radius:0 10px 10px 0;padding:16px 22px;margin-bottom:24px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--gold2);line-height:2;">
+    <div style="font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:var(--purple);margin-bottom:8px;">Given</div>
+    dy/dt = −50y &nbsp;·&nbsp; y(0) = 1 &nbsp;·&nbsp; h = 0.1 &nbsp;·&nbsp; λ = −50
+  </div>
+
+  <!-- Steps grid -->
+  <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:28px;">
+
+    <div style="display:flex;gap:14px;align-items:flex-start;background:rgba(255,255,255,0.025);border:1px solid var(--border);border-radius:12px;padding:18px 20px;">
+      <div style="width:32px;height:32px;border-radius:50%;background:rgba(167,139,250,0.15);border:1.5px solid var(--purple);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--purple);flex-shrink:0;">1</div>
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Compute z = hλ</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--gold2);">z = 0.1 × (−50) = <span style="color:var(--gold);font-size:18px;">−5</span></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:14px;align-items:flex-start;background:rgba(255,255,255,0.025);border:1px solid var(--border);border-radius:12px;padding:18px 20px;">
+      <div style="width:32px;height:32px;border-radius:50%;background:rgba(167,139,250,0.15);border:1.5px solid var(--purple);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--purple);flex-shrink:0;">2</div>
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Amplification Factor R(z) = 1 + z</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--gold2);">R(z) = 1 + (−5) = <span style="color:var(--red);font-size:18px;">−4</span></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--gold2);margin-top:6px;">|R(z)| = <span style="color:var(--red);font-size:18px;">4</span> &gt; 1 &nbsp;→&nbsp; <span style="color:var(--red);">✗ UNSTABLE</span></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:14px;align-items:flex-start;background:rgba(255,77,109,0.06);border:1px solid rgba(255,77,109,0.3);border-radius:12px;padding:18px 20px;">
+      <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,77,109,0.15);border:1.5px solid var(--red);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--red);flex-shrink:0;">3</div>
+      <div style="flex:1;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Forward Euler Iterations: yₙ₊₁ = yₙ × (1 + hλ) = yₙ × (−4)</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+          <div style="text-align:center;background:rgba(0,0,0,0.3);border-radius:8px;padding:12px 8px;">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">t = 0.0</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--white);">y₀ = 1</div>
+          </div>
+          <div style="text-align:center;background:rgba(0,0,0,0.3);border-radius:8px;padding:12px 8px;">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">t = 0.1</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--red);">y₁ = −4</div>
+          </div>
+          <div style="text-align:center;background:rgba(0,0,0,0.3);border-radius:8px;padding:12px 8px;">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">t = 0.2</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--red);">y₂ = 16</div>
+          </div>
+          <div style="text-align:center;background:rgba(0,0,0,0.3);border-radius:8px;padding:12px 8px;">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">t = 0.3</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--red);">y₃ = −64</div>
+          </div>
+        </div>
+        <div style="margin-top:14px;font-size:13px;color:var(--text);line-height:1.7;">
+          The solution <strong style="color:var(--red);">oscillates and diverges</strong> — alternating sign, doubling magnitude each step.
+          Exact solution decays smoothly to 0. Step size h = 0.1 violates the stability limit
+          <code style="font-family:'JetBrains Mono',monospace;color:var(--gold);">h &lt; 2/|λ| = 0.04</code>.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Mini graph -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;">
+    <div>
+      <div style="background:#030b18;border:1px solid var(--border);border-radius:14px;padding:4px;position:relative;">
+        <canvas id="s8canvas" width="500" height="300"></canvas>
+        <div style="position:absolute;top:12px;left:16px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);">FORWARD EULER vs EXACT</div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;font-family:'JetBrains Mono',monospace;">FE diverges wildly — exact solution quietly decays</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;justify-content:center;">
+      <div style="background:rgba(255,77,109,0.08);border:1px solid rgba(255,77,109,0.3);border-radius:10px;padding:16px 18px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--red);letter-spacing:1px;margin-bottom:8px;">WHY IT FAILS</div>
+        <p style="font-size:13px;color:var(--text);line-height:1.7;">
+          h = 0.1 gives z = −5, far outside the Forward Euler stability disk (|z+1| ≤ 1).
+          The amplification factor |R| = 4 means each step <em>quadruples</em> the error.
+        </p>
+      </div>
+      <div style="background:rgba(0,212,184,0.07);border:1px solid rgba(0,212,184,0.3);border-radius:10px;padding:16px 18px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--teal);letter-spacing:1px;margin-bottom:8px;">FIX: USE BACKWARD EULER</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--gold2);line-height:2;">
+          R_BE(z) = 1/(1−z) = 1/6 ≈ 0.167<br>
+          |R_BE| = 0.167 &lt; 1 &nbsp;→&nbsp; <span style="color:var(--green);">✓ STABLE</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     S9 — LIMITATIONS & SOLUTIONS
+════════════════════════════════════════════════ -->
+<section id="s9">
+  <div class="sec-label">Limitations & Improvements</div>
+  <div class="sec-title">What Goes Wrong — <em>and How to Fix It</em></div>
+  <p class="sec-desc">
+    Every numerical method has boundaries. Understanding where they fail — and which alternatives succeed — is the core practical lesson of stability theory.
+  </p>
+
+  <!-- Limitations -->
+  <div style="margin-bottom:32px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--red);margin-bottom:14px;">⚠ Limitations</div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+
+      <div style="display:flex;gap:14px;align-items:flex-start;background:rgba(255,77,109,0.06);border:1px solid rgba(255,77,109,0.25);border-radius:10px;padding:16px 18px;">
+        <div style="font-size:20px;flex-shrink:0;margin-top:2px;">❌</div>
+        <div>
+          <div style="font-weight:600;color:var(--white);margin-bottom:5px;">Forward Euler becomes unstable for large h</div>
+          <p style="font-size:13px;color:var(--muted);line-height:1.7;">Stability requires |1 + hλ| &lt; 1 → h &lt; 2/|λ|. For stiff systems with |λ| ≫ 1, this forces an extremely small step size, making the method computationally expensive even when the solution changes slowly.</p>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:14px;align-items:flex-start;background:rgba(255,77,109,0.06);border:1px solid rgba(255,77,109,0.25);border-radius:10px;padding:16px 18px;">
+        <div style="font-size:20px;flex-shrink:0;margin-top:2px;">❌</div>
+        <div>
+          <div style="font-weight:600;color:var(--white);margin-bottom:5px;">All explicit methods fail for stiff equations</div>
+          <p style="font-size:13px;color:var(--muted);line-height:1.7;">Explicit methods (FE, RK2, RK4) have finite stability regions. For stiff ODEs where eigenvalues span several orders of magnitude, no explicit method can take a step size large enough to be efficient.</p>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:14px;align-items:flex-start;background:rgba(255,77,109,0.06);border:1px solid rgba(255,77,109,0.25);border-radius:10px;padding:16px 18px;">
+        <div style="font-size:20px;flex-shrink:0;margin-top:2px;">❌</div>
+        <div>
+          <div style="font-weight:600;color:var(--white);margin-bottom:5px;">Stability ≠ Accuracy</div>
+          <p style="font-size:13px;color:var(--muted);line-height:1.7;">A method can be stable (values don't blow up) but still inaccurate. Example: FE with z = −1 gives |R| = 0 — the solution collapses to zero in one step, giving 100% error despite being "stable".</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Solutions / Improvements -->
+  <div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--teal);margin-bottom:14px;">✅ Solutions & Improvements</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+
+      <div style="background:rgba(0,212,184,0.07);border:1px solid rgba(0,212,184,0.3);border-radius:10px;padding:18px;">
+        <div style="font-size:22px;margin-bottom:10px;">🛡️</div>
+        <div style="font-weight:600;color:var(--white);margin-bottom:8px;">Use Backward Euler (A-stable)</div>
+        <p style="font-size:13px;color:var(--muted);line-height:1.7;">Backward Euler's stability region is the entire left half of the complex plane. It is unconditionally stable for any h when Re(λ) &lt; 0 — the standard case for physical systems that decay.</p>
+        <div style="margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--teal);">yₙ₊₁ = yₙ / (1 − hλ)</div>
+      </div>
+
+      <div style="background:rgba(0,212,184,0.07);border:1px solid rgba(0,212,184,0.3);border-radius:10px;padding:18px;">
+        <div style="font-size:22px;margin-bottom:10px;">⚙️</div>
+        <div style="font-weight:600;color:var(--white);margin-bottom:8px;">Use implicit methods for stiff problems</div>
+        <p style="font-size:13px;color:var(--muted);line-height:1.7;">General implicit methods (Crank-Nicolson, BDF, SDIRK) solve a system of equations at each step but can take arbitrarily large steps for stiff problems. Libraries like SciPy's <code style="font-family:'JetBrains Mono',monospace;">solve_ivp</code> use them automatically.</p>
+      </div>
+
+      <div style="background:rgba(167,139,250,0.07);border:1px solid rgba(167,139,250,0.25);border-radius:10px;padding:18px;">
+        <div style="font-size:22px;margin-bottom:10px;">📐</div>
+        <div style="font-weight:600;color:var(--white);margin-bottom:8px;">Reduce step size h</div>
+        <p style="font-size:13px;color:var(--muted);line-height:1.7;">The simplest fix: keep h &lt; 2/|λ_max|. Not efficient for stiff problems, but valid for mildly stiff or moderate λ values. Adaptive step-size control (e.g., RK45) does this automatically.</p>
+      </div>
+
+      <div style="background:rgba(167,139,250,0.07);border:1px solid rgba(167,139,250,0.25);border-radius:10px;padding:18px;">
+        <div style="font-size:22px;margin-bottom:10px;">🔬</div>
+        <div style="font-weight:600;color:var(--white);margin-bottom:8px;">Use higher-order implicit methods</div>
+        <p style="font-size:13px;color:var(--muted);line-height:1.7;">RK4 has a larger stability region than FE or RK2 and achieves O(h⁴) accuracy. For very stiff problems, BDF (Backward Differentiation Formulas) methods offer both A-stability and high accuracy.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Code example -->
+  <div style="margin-top:32px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:14px;">🐍 Python Code Example — Forward Euler vs Backward Euler</div>
+    <div style="background:#020810;border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);">
+        <div style="display:flex;gap:5px;"><span style="width:10px;height:10px;border-radius:50%;background:#ff5f57;display:inline-block;"></span><span style="width:10px;height:10px;border-radius:50%;background:#ffbd2e;display:inline-block;"></span><span style="width:10px;height:10px;border-radius:50%;background:#28ca41;display:inline-block;"></span></div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto;">fe_vs_be.py</span>
+      </div>
+<pre style="padding:20px;font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.85;color:var(--text);overflow-x:auto;margin:0;"><span style="color:#4a6080;font-style:italic"># Forward Euler vs Backward Euler for dy/dt = λy</span>
+<span style="color:#a78bfa;font-weight:600">import</span> numpy <span style="color:#a78bfa;font-weight:600">as</span> np
+<span style="color:#a78bfa;font-weight:600">import</span> matplotlib.pyplot <span style="color:#a78bfa;font-weight:600">as</span> plt
+
+lam, h, y0, n = <span style="color:#ffd060">-50</span>, <span style="color:#ffd060">0.1</span>, <span style="color:#ffd060">1.0</span>, <span style="color:#ffd060">10</span>
+
+<span style="color:#4a6080;font-style:italic"># Forward Euler: yₙ₊₁ = yₙ(1 + hλ)  — explicit</span>
+t_fe, y_fe = [<span style="color:#ffd060">0</span>], [y0]
+<span style="color:#a78bfa;font-weight:600">for</span> _ <span style="color:#a78bfa;font-weight:600">in</span> <span style="color:#60a5fa">range</span>(n):
+    y_fe.append(y_fe[<span style="color:#ffd060">-1</span>] * (<span style="color:#ffd060">1</span> + h * lam))
+    t_fe.append(t_fe[<span style="color:#ffd060">-1</span>] + h)
+
+<span style="color:#4a6080;font-style:italic"># Backward Euler: yₙ₊₁ = yₙ/(1 − hλ)  — implicit, always stable</span>
+t_be, y_be = [<span style="color:#ffd060">0</span>], [y0]
+<span style="color:#a78bfa;font-weight:600">for</span> _ <span style="color:#a78bfa;font-weight:600">in</span> <span style="color:#60a5fa">range</span>(n):
+    y_be.append(y_be[<span style="color:#ffd060">-1</span>] / (<span style="color:#ffd060">1</span> - h * lam))
+    t_be.append(t_be[<span style="color:#ffd060">-1</span>] + h)
+
+<span style="color:#4a6080;font-style:italic"># Exact solution</span>
+t_ex = np.linspace(<span style="color:#ffd060">0</span>, n*h, <span style="color:#ffd060">300</span>)
+y_ex = y0 * np.exp(lam * t_ex)
+
+<span style="color:#4a6080;font-style:italic"># Print stability info</span>
+<span style="color:#60a5fa">print</span>(<span style="color:#86efac">f"z = hλ = {h*lam}"</span>)
+<span style="color:#60a5fa">print</span>(<span style="color:#86efac">f"|R_FE| = {abs(1+h*lam):.2f}  → {'STABLE' if abs(1+h*lam)<1 else 'UNSTABLE'}"</span>)
+<span style="color:#60a5fa">print</span>(<span style="color:#86efac">f"|R_BE| = {abs(1/(1-h*lam)):.4f} → STABLE (always)"</span>)
+
+plt.plot(t_ex, y_ex, <span style="color:#86efac">'--'</span>, label=<span style="color:#86efac">'Exact'</span>)
+plt.plot(t_fe, y_fe, <span style="color:#86efac">'o-'</span>, label=<span style="color:#86efac">'Forward Euler ✗'</span>, color=<span style="color:#86efac">'red'</span>)
+plt.plot(t_be, y_be, <span style="color:#86efac">'s-'</span>, label=<span style="color:#86efac">'Backward Euler ✓'</span>, color=<span style="color:#86efac">'cyan'</span>)
+plt.legend(); plt.show()</pre>
+    </div>
+    <div style="margin-top:12px;background:rgba(240,165,0,0.07);border:1px solid rgba(240,165,0,0.2);border-radius:8px;padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);line-height:1.85;">
+      <span style="color:var(--gold);">▶ Output:</span><br>
+      z = hλ = -5.0<br>
+      |R_FE| = 4.00 → <span style="color:var(--red);">UNSTABLE</span><br>
+      |R_BE| = 0.1667 → <span style="color:var(--green);">STABLE (always)</span>
+    </div>
+  </div>
+
+  <!-- ── CTA: Full Python Solutions Page ── -->
+  <div style="margin-top:36px;background:linear-gradient(135deg,rgba(167,139,250,0.1) 0%,rgba(0,212,184,0.08) 100%);border:1px solid rgba(167,139,250,0.35);border-radius:16px;padding:28px 30px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+    <div style="flex:1;min-width:260px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:var(--purple);margin-bottom:8px;">📋 Requirement No. 5 — Python Implementation</div>
+      <div style="font-family:'Crimson Pro',serif;font-size:22px;color:var(--white);margin-bottom:8px;">Full Python Solutions with <em>Step-by-Step Code</em></div>
+      <p style="font-size:13px;color:var(--muted);line-height:1.7;">Complete, runnable Python code for all practice problems — Problem 1 (Forward Euler stability), Problem 2 (FE vs BE vs RK2 comparison), and the full Stiff ODE simulation from Slide 15. Each solution includes step-by-step derivation, terminal output, downloadable <code style="font-family:'JetBrains Mono',monospace;color:var(--gold);">.py</code> files, and live interactive graphs.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;align-items:center;">
+      <a href="solutions.html" style="display:inline-flex;align-items:center;gap:10px;background:var(--purple);color:#fff;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;padding:14px 28px;border-radius:10px;text-decoration:none;transition:all .2s;white-space:nowrap;box-shadow:0 4px 24px rgba(167,139,250,0.35);" onmouseover="this.style.background='#b59ffe';this.style.transform='translateY(-2px)'" onmouseout="this.style.background='var(--purple)';this.style.transform=''">
+        🐍 Open Python Solutions →
+      </a>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;text-align:center;">Problems 1 · 2 · Stiff ODE · Playground</div>
+    </div>
+  </div>
+
+</section>
+
+</div><!-- .page -->
+
+<footer>
+  <div style="font-size:16px;font-family:'Crimson Pro',serif;color:var(--text);margin-bottom:8px;">
+    Stiff ODEs & Numerical Stability — Interactive Visualization
+  </div>
+  <div>22CSE021 · Maimuna Akter · Lecture 39 · Numerical Methods</div>
+  <div style="margin-top:8px;color:rgba(122,143,168,0.5);">
+    All visualizations are mathematically exact · Built for conceptual understanding
+  </div>
+</footer>
+
+<script>
+// ═══════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════
+function setupCanvas(canvas, W, H) {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return ctx;
+}
+
+function tx(v, xMin, xMax, pW) { return (v - xMin) / (xMax - xMin) * pW; }
+function ty(v, yMin, yMax, pH) { return (1 - (v - yMin) / (yMax - yMin)) * pH; }
+
+const COLORS = {
+  bg: '#030b18',
+  grid: 'rgba(26,48,85,0.6)',
+  axis: 'rgba(120,140,168,0.5)',
+  exact: 'rgba(200,216,232,0.7)',
+  gold: '#f0a500',
+  teal: '#00d4b8',
+  red:  '#ff4d6d',
+  green:'#2ecc71',
+  purple:'#a78bfa',
+  muted:'#7a8fa8'
+};
+
+function drawAxes(ctx, pad, W, H, xMin, xMax, yMin, yMax, opts={}) {
+  const pW = W - pad.l - pad.r;
+  const pH = H - pad.t - pad.b;
+
+  ctx.fillStyle = COLORS.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // grid
+  ctx.strokeStyle = COLORS.grid;
+  ctx.lineWidth = 1;
+  for(let i=0;i<=8;i++){
+    const x = pad.l + i/8*pW;
+    ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, H-pad.b); ctx.stroke();
+  }
+  for(let i=0;i<=6;i++){
+    const y = pad.t + i/6*pH;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W-pad.r, y); ctx.stroke();
+  }
+
+  // zero lines
+  if(yMin < 0 && yMax > 0) {
+    const zy = pad.t + ty(0, yMin, yMax, pH);
+    ctx.strokeStyle = COLORS.axis; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(pad.l, zy); ctx.lineTo(W-pad.r, zy); ctx.stroke();
+  }
+
+  // axes labels
+  ctx.fillStyle = COLORS.muted;
+  ctx.font = '11px JetBrains Mono';
+  if(opts.xlabel) ctx.fillText(opts.xlabel, W-pad.r+4, H-pad.b);
+  if(opts.ylabel) ctx.fillText(opts.ylabel, pad.l-20, pad.t+4);
+
+  const nTickY = 5;
+  for(let i=0;i<=nTickY;i++){
+    const v = yMin + i/nTickY*(yMax-yMin);
+    ctx.fillText(v.toFixed(1), 2, pad.t + ty(v, yMin, yMax, pH) + 4);
+  }
+  const nTickX = 5;
+  for(let i=0;i<=nTickX;i++){
+    const v = xMin + i/nTickX*(xMax-xMin);
+    const xp = pad.l + tx(v, xMin, xMax, pW);
+    ctx.fillText(v.toFixed(2), xp-10, H-pad.b+14);
+  }
+}
+
+function plotLine(ctx, xs, ys, xMin, xMax, yMin, yMax, pad, W, H, color, width=2, dash=[]) {
+  const pW = W-pad.l-pad.r, pH = H-pad.t-pad.b;
+  const cx = v => pad.l + tx(v, xMin, xMax, pW);
+  const cy = v => pad.t + ty(v, yMin, yMax, pH);
+
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  if(dash.length) ctx.setLineDash(dash); else ctx.setLineDash([]);
+  let started = false;
+  xs.forEach((x,i) => {
+    const yv = Math.max(yMin, Math.min(yMax, ys[i]));
+    if(!isFinite(ys[i])) { started = false; return; }
+    if(!started) { ctx.moveTo(cx(x), cy(yv)); started=true; }
+    else ctx.lineTo(cx(x), cy(yv));
+  });
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function plotDots(ctx, xs, ys, xMin, xMax, yMin, yMax, pad, W, H, color, r=4) {
+  const pW = W-pad.l-pad.r, pH = H-pad.t-pad.b;
+  const cx = v => pad.l + tx(v, xMin, xMax, pW);
+  const cy = v => pad.t + ty(v, yMin, yMax, pH);
+  ctx.fillStyle = color;
+  xs.forEach((x,i) => {
+    const yv = ys[i];
+    if(!isFinite(yv)) return;
+    const yc = Math.max(yMin, Math.min(yMax, yv));
+    ctx.beginPath();
+    ctx.arc(cx(x), cy(yc), r, 0, 2*Math.PI);
+    ctx.fill();
+  });
+}
+
+// ═══════════════════════════════════════
+// BACKGROUND PARTICLES
+// ═══════════════════════════════════════
+(function() {
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [];
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  function init() {
+    resize();
+    particles = Array.from({length: 60}, () => ({
+      x: Math.random()*W, y: Math.random()*H,
+      vx: (Math.random()-.5)*0.15, vy: (Math.random()-.5)*0.15,
+      r: Math.random()*1.5+0.5,
+      op: Math.random()*0.3+0.1,
+      color: Math.random() > 0.5 ? '#f0a500' : '#00d4b8'
+    }));
+  }
+
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if(p.x < 0) p.x = W; if(p.x > W) p.x = 0;
+      if(p.y < 0) p.y = H; if(p.y > H) p.y = 0;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, 2*Math.PI);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = p.op;
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', resize);
+  init();
+  draw();
+})();
+
+// ═══════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════
+function showSection(id) {
+  document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const idx = ['s1','s2','s3','s4','s5','s6','s7','s8','s9'].indexOf(id);
+  document.querySelectorAll('.nav-btn')[idx].classList.add('active');
+
+  // lazy draw
+  const draws = {s1:drawStiffPlot, s2:drawAmpFactor, s3:drawRegionPlot,
+                 s4:drawFwdEuler, s5:drawBwdEuler, s6:drawRK, s7:drawAllMethods,
+                 s8:drawPractice};
+  if(draws[id]) setTimeout(draws[id], 50);
+}
+
+// ═══════════════════════════════════════
+// SECTION 1 — STIFF PLOT
+// ═══════════════════════════════════════
+let stiffView = 'fast';
+
+function setStiffView(v) {
+  stiffView = v;
+  document.getElementById('stiff_fast_btn').classList.toggle('active', v==='fast');
+  document.getElementById('stiff_slow_btn').classList.toggle('active', v==='slow');
+  (window.drawStiffPlot || drawStiffPlot)();
+}
+
+function drawStiffPlot() {
+  const lam = parseFloat(document.getElementById('stiff_lam').value);
+  document.getElementById('stiff_lam_d').textContent = lam.toFixed(0);
+  document.getElementById('fast_lam_disp').textContent = `λ₁ = ${lam}`;
+  const ratio = Math.abs(lam);
+  document.getElementById('stiff_ratio_disp').textContent = `S = ${ratio}`;
+  const steps = Math.ceil(1 * Math.abs(lam) / 2);
+  document.getElementById('stiff_steps_disp').textContent = `Need ≥ ${steps} steps (t=0 to 1)`;
+
+  const N = 600;
+
+  // Fast transient canvas — y(t) = e^{-t} - e^{lam*t}  (slide 15 equation: dy/dt = -1000y + 1000e^{-t})
+  const tFast = Array.from({length:N}, (_,i) => i/(N-1)*0.015);
+  const yFast = tFast.map(t => Math.exp(-t) - Math.exp(lam*t));
+  {
+    const c = document.getElementById('stiffC1');
+    const W=520, H=360, pad={l:55,r:20,t:30,b:45};
+    const ctx = setupCanvas(c, W, H);
+    const pW=W-pad.l-pad.r, pH=H-pad.t-pad.b;
+    const xMin=0, xMax=0.015;
+    const yMin=Math.min(...yFast)-0.05, yMax=Math.max(...yFast)+0.05;
+    drawAxes(ctx, pad, W, H, xMin, xMax, yMin, yMax, {xlabel:'t', ylabel:'y'});
+    plotLine(ctx, tFast, yFast, xMin, xMax, yMin, yMax, pad, W, H, COLORS.gold, 2.5);
+
+    // Critical step size line
+    const hCrit = 2/Math.abs(lam);
+    if(hCrit < xMax) {
+      ctx.strokeStyle='rgba(255,77,109,0.5)';
+      ctx.lineWidth=1; ctx.setLineDash([4,3]);
+      const xp = pad.l + tx(hCrit, xMin, xMax, pW);
+      ctx.beginPath(); ctx.moveTo(xp, pad.t); ctx.lineTo(xp, H-pad.b); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle=COLORS.red; ctx.font='10px JetBrains Mono';
+      ctx.fillText(`h_crit=${hCrit.toFixed(4)}`, xp+3, pad.t+14);
+    }
+    ctx.fillStyle=COLORS.gold; ctx.font='bold 11px JetBrains Mono';
+    ctx.fillText('Fast transient: −e^(λt) dominates', pad.l+8, pad.t+18);
+  }
+
+  // Slow canvas — full solution over t=0..10
+  const tSlow = Array.from({length:N}, (_,i) => i/(N-1)*10);
+  const ySlow = tSlow.map(t => Math.exp(-t) - Math.exp(lam*t));
+  {
+    const c = document.getElementById('stiffC2');
+    const W=520, H=360, pad={l:55,r:20,t:30,b:45};
+    const ctx = setupCanvas(c, W, H);
+    const xMin=0, xMax=10;
+    const yMin=-0.1, yMax=1.1;
+    drawAxes(ctx, pad, W, H, xMin, xMax, yMin, yMax, {xlabel:'t', ylabel:'y'});
+    plotLine(ctx, tSlow, ySlow, xMin, xMax, yMin, yMax, pad, W, H, COLORS.teal, 2.5);
+
+    // y=0 asymptote label
+    const pW=W-pad.l-pad.r, pH=H-pad.t-pad.b;
+    ctx.strokeStyle='rgba(255,77,109,0.4)'; ctx.lineWidth=1; ctx.setLineDash([6,4]);
+    const y0p = pad.t + ty(0, yMin, yMax, pH);
+    ctx.beginPath(); ctx.moveTo(pad.l, y0p); ctx.lineTo(W-20, y0p); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle=COLORS.red; ctx.font='10px JetBrains Mono';
+    ctx.fillText('y → 0 (decays to zero)', pad.l+60, y0p-6);
+
+    ctx.fillStyle=COLORS.teal; ctx.font='bold 11px JetBrains Mono';
+    ctx.fillText('Full solution: e⁻ᵗ − e^(λt)', pad.l+8, pad.t+18);
+  }
+}
+
+// ═══════════════════════════════════════
+// SECTION 2 — AMPLIFICATION FACTOR
+// ═══════════════════════════════════════
+let ampMethod = 'fe';
+
+function setAmpMethod(m) {
+  ampMethod = m;
+  ['fe','be','rk4'].forEach(x => {
+    document.getElementById(`amp_${x}_btn`).classList.toggle('active', x===m);
+  });
+  (window.drawAmpFactor || drawAmpFactor)();
+}
+
+function getR(z, method) {
+  if(method === 'fe') return Math.abs(1 + z);
+  if(method === 'be') return Math.abs(1/(1 - z));
+  if(method === 'rk4') return Math.abs(1 + z + z*z/2 + z*z*z/6 + z*z*z*z/24);
+  return 1;
+}
+
+function getRformula(method) {
+  if(method === 'fe')  return 'R(z) = 1 + z';
+  if(method === 'be')  return 'R(z) = 1/(1 − z)';
+  if(method === 'rk4') return 'R(z) = 1 + z + z²/2 + z³/6 + z⁴/24';
+}
+
+function drawAmpFactor() {
+  const lam = parseFloat(document.getElementById('amp_lam').value);
+  const h   = parseFloat(document.getElementById('amp_h').value);
+  document.getElementById('amp_lam_d').textContent = lam.toFixed(1);
+  document.getElementById('amp_h_d').textContent   = h.toFixed(2);
+
+  const z = h * lam;
+  const Rz = getR(z, ampMethod);
+  const stable = Rz < 1;
+
+  document.getElementById('z_val_disp').textContent   = z.toFixed(4);
+  document.getElementById('Rz_val_disp').textContent  = Rz.toFixed(4);
+  document.getElementById('Rz_val_disp').style.color  = stable ? COLORS.green : COLORS.red;
+
+  const bar = document.getElementById('amp_bar');
+  const pct = Math.min(100, Rz * 50);
+  bar.style.width = pct + '%';
+  bar.style.background = stable ? COLORS.green : (Rz < 1.5 ? COLORS.gold : COLORS.red);
+
+  const status = document.getElementById('amp_status');
+  status.className = 'status ' + (stable ? 'stable' : 'unstable');
+  status.textContent = stable
+    ? `✓ STABLE — |R(z)| = ${Rz.toFixed(4)} < 1`
+    : `✗ UNSTABLE — |R(z)| = ${Rz.toFixed(4)} > 1 — errors grow!`;
+
+  // Power display
+  const n10 = Math.pow(Rz, 10).toFixed(4);
+  document.getElementById('rz_power_disp').textContent =
+    `After 10 steps: ${Rz.toFixed(3)}¹⁰ = ${n10}`;
+
+  // Main solution canvas
+  {
+    const c = document.getElementById('ampCanvas');
+    const W=520, H=360, pad={l:55,r:20,t:30,b:45};
+    const ctx = setupCanvas(c, W, H);
+    const N = 40;
+    const nSteps = 35;
+    const t = Array.from({length: nSteps+1}, (_,i) => i*h);
+    const tExact = Array.from({length:300}, (_,i) => i/299*nSteps*h);
+    const yExact = tExact.map(tv => Math.exp(lam*tv));
+    let yNum = [1];
+    for(let i=0;i<nSteps;i++) {
+      if(ampMethod==='fe') yNum.push(yNum[i]*(1+h*lam));
+      else if(ampMethod==='be') yNum.push(yNum[i]/(1-h*lam));
+      else { // RK4
+        const yi = yNum[i];
+        const k1 = lam*yi;
+        const k2 = lam*(yi+0.5*h*k1);
+        const k3 = lam*(yi+0.5*h*k2);
+        const k4 = lam*(yi+h*k3);
+        yNum.push(yi + h/6*(k1+2*k2+2*k3+k4));
+      }
+    }
+
+    const allY = [...yNum, ...yExact].filter(v => isFinite(v) && Math.abs(v) < 20);
+    const yMin = Math.min(...allY, -0.5);
+    const yMax = Math.max(...allY, 1.2);
+    const xMax = nSteps*h;
+
+    drawAxes(ctx, pad, W, H, 0, xMax, yMin, yMax, {xlabel:'t', ylabel:'y'});
+    plotLine(ctx, tExact, yExact, 0, xMax, yMin, yMax, pad, W, H, COLORS.exact, 1.5, [8,4]);
+    plotLine(ctx, t, yNum, 0, xMax, yMin, yMax, pad, W, H, stable ? COLORS.teal : COLORS.red, 2);
+    plotDots(ctx, t, yNum, 0, xMax, yMin, yMax, pad, W, H, stable ? COLORS.gold : COLORS.red, 4);
+
+    ctx.fillStyle = COLORS.muted;
+    ctx.font = '11px JetBrains Mono';
+    ctx.fillText(getRformula(ampMethod), pad.l+8, pad.t+18);
+  }
+
+  // RK power canvas
+  {
+    const c = document.getElementById('rzPowerCanvas');
+    const W=340, H=120, pad={l:35,r:10,t:10,b:30};
+    const ctx = setupCanvas(c, W, H);
+    const pW=W-pad.l-pad.r, pH=H-pad.t-pad.b;
+    ctx.fillStyle = COLORS.bg;
+    ctx.fillRect(0,0,W,H);
+
+    const nMax = 20;
+    const vals = Array.from({length:nMax+1}, (_,n) => Math.min(5, Math.pow(Rz,n)));
+    const yMax = Math.max(...vals, 1.2);
+    const xMax = nMax;
+
+    ctx.strokeStyle = COLORS.grid; ctx.lineWidth=1;
+    for(let i=0;i<=4;i++){
+      const y=pad.t+i/4*pH; ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
+    }
+
+    // y=1 line
+    const y1p = pad.t + ty(1, 0, yMax, pH);
+    ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1; ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(pad.l,y1p); ctx.lineTo(W-pad.r,y1p); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Fill area
+    ctx.beginPath();
+    vals.forEach((v,n) => {
+      const xp = pad.l + tx(n,0,xMax,pW);
+      const yp = pad.t + ty(v,0,yMax,pH);
+      if(n===0) ctx.moveTo(xp,yp); else ctx.lineTo(xp,yp);
+    });
+    ctx.lineTo(pad.l+pW, pad.t+pH);
+    ctx.lineTo(pad.l, pad.t+pH);
+    ctx.closePath();
+    ctx.fillStyle = stable ? 'rgba(0,212,184,0.15)' : 'rgba(255,77,109,0.15)';
+    ctx.fill();
+
+    plotLine(ctx, Array.from({length:nMax+1},(_,n)=>n), vals, 0, xMax, 0, yMax, pad, W, H,
+             stable ? COLORS.teal : COLORS.red, 2);
+
+    ctx.fillStyle = COLORS.muted; ctx.font='9px JetBrains Mono';
+    ctx.fillText('n (steps)', W-pad.r-8, H-2);
+    ctx.fillText('|R|ⁿ', pad.l-28, pad.t+8);
+  }
+}
+
+// ═══════════════════════════════════════
+// SECTION 3 — STABILITY REGIONS
+// ═══════════════════════════════════════
+let regionView = 'all';
+
+function setRegionView(v) {
+  regionView = v;
+  ['all','euler','rk'].forEach(x => {
+    document.getElementById(`reg_${x}_btn`).classList.toggle('active', x===v);
+  });
+  drawRegionPlot();
+}
+
+function drawRegionPlot() {
+  const lam = parseFloat(document.getElementById('reg_lam').value);
+  const h   = parseFloat(document.getElementById('reg_h').value);
+  document.getElementById('reg_lam_d').textContent = lam.toFixed(1);
+  document.getElementById('reg_h_d').textContent   = h.toFixed(2);
+
+  const c = document.getElementById('regionCanvas');
+  const W=520, H=520, pad={l:40,r:20,t:20,b:40};
+  const ctx = setupCanvas(c, W, H);
+  const pW=W-pad.l-pad.r, pH=H-pad.t-pad.b;
+
+  ctx.fillStyle = COLORS.bg;
+  ctx.fillRect(0,0,W,H);
+
+  const xMin=-3.5, xMax=1.5, yMin=-2.5, yMax=2.5;
+  const cx = v => pad.l + tx(v, xMin, xMax, pW);
+  const cy = v => pad.t + ty(v, yMin, yMax, pH);
+
+  // Grid
+  ctx.strokeStyle = COLORS.grid; ctx.lineWidth=1;
+  for(let x=-3;x<=1;x++){
+    const xp=cx(x); ctx.beginPath();ctx.moveTo(xp,pad.t);ctx.lineTo(xp,H-pad.b);ctx.stroke();
+  }
+  for(let y=-2;y<=2;y++){
+    const yp=cy(y); ctx.beginPath();ctx.moveTo(pad.l,yp);ctx.lineTo(W-pad.r,yp);ctx.stroke();
+  }
+
+  // Axes
+  ctx.strokeStyle='rgba(120,140,168,0.6)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(cx(0),pad.t); ctx.lineTo(cx(0),H-pad.b); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(pad.l,cy(0)); ctx.lineTo(W-pad.r,cy(0)); ctx.stroke();
+
+  ctx.fillStyle=COLORS.muted; ctx.font='11px JetBrains Mono';
+  ctx.fillText('Re(hλ)', W-pad.r-30, cy(0)+14);
+  ctx.fillText('Im(hλ)', cx(0)+5, pad.t+10);
+
+  // Tick labels
+  [-3,-2,-1,0,1].forEach(v=>{
+    ctx.fillText(v, cx(v)-6, cy(0)+16);
+  });
+  [-2,-1,1,2].forEach(v=>{
+    ctx.fillText(v, cx(0)+5, cy(v)+4);
+  });
+
+  // ── Implicit Euler (left half-plane) ──
+  if(regionView !== 'rk') {
+    ctx.fillStyle = 'rgba(240,165,0,0.07)';
+    ctx.strokeStyle = 'rgba(240,165,0,0.3)';
+    ctx.lineWidth = 1.5; ctx.setLineDash([6,4]);
+    ctx.fillRect(pad.l, pad.t, cx(0)-pad.l, pH);
+    ctx.beginPath();
+    ctx.moveTo(cx(0), pad.t);
+    ctx.lineTo(cx(0), H-pad.b);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // ── RK4 stability region ──
+  if(regionView === 'all' || regionView === 'rk') {
+    ctx.beginPath();
+    const N=360;
+    let first=true;
+    for(let xi=0;xi<100;xi++) {
+      for(let yi=0;yi<100;yi++) {
+        const rx = xMin + xi/100*(xMax-xMin);
+        const iy = yMin + yi/100*(yMax-yMin);
+        const z_r=rx, z_i=iy;
+        // |R(z)| for RK4: 1 + z + z^2/2 + z^3/6 + z^4/24, z complex
+        const a=z_r, b=z_i;
+        // R = 1 + (a+bi) + (a+bi)^2/2 + ...
+        // Just sample boundary pixels
+      }
+    }
+    // Draw RK4 region by sampling
+    const imgData = ctx.createImageData(pW|0, pH|0);
+    for(let xi=0;xi<(pW|0);xi++) {
+      for(let yi=0;yi<(pH|0);yi++) {
+        const rx = xMin + xi/pW*(xMax-xMin);
+        const iy = yMax - yi/pH*(yMax-yMin);
+        // RK4 amplification factor
+        const rk4 = rk4Amp(rx, iy);
+        if(rk4 <= 1) {
+          const idx = (yi*(pW|0)+xi)*4;
+          imgData.data[idx]   = 167;
+          imgData.data[idx+1] = 139;
+          imgData.data[idx+2] = 250;
+          imgData.data[idx+3] = 80;
+        }
+      }
+    }
+    ctx.putImageData(imgData, pad.l, pad.t);
+  }
+
+  // ── Explicit Euler (circle |1+z|≤1) ──
+  if(regionView !== 'rk') {
+    // Fill Euler circle
+    const imgData2 = ctx.createImageData(pW|0, pH|0);
+    for(let xi=0;xi<(pW|0);xi++) {
+      for(let yi=0;yi<(pH|0);yi++) {
+        const rx = xMin + xi/pW*(xMax-xMin);
+        const iy = yMax - yi/pH*(yMax-yMin);
+        const amp = Math.sqrt((1+rx)**2 + iy**2);
+        if(amp <= 1) {
+          const idx = (yi*(pW|0)+xi)*4;
+          imgData2.data[idx]   = 0;
+          imgData2.data[idx+1] = 212;
+          imgData2.data[idx+2] = 184;
+          imgData2.data[idx+3] = 100;
+        }
+      }
+    }
+    ctx.putImageData(imgData2, pad.l, pad.t);
+
+    // Euler boundary circle
+    ctx.beginPath();
+    ctx.strokeStyle = COLORS.teal;
+    ctx.lineWidth = 2; ctx.setLineDash([]);
+    for(let i=0;i<=360;i++) {
+      const angle = i*Math.PI/180;
+      const rx = -1 + Math.cos(angle);
+      const iy = Math.sin(angle);
+      if(i===0) ctx.moveTo(cx(rx), cy(iy));
+      else ctx.lineTo(cx(rx), cy(iy));
+    }
+    ctx.stroke();
+  }
+
+  // ── Current hλ point ──
+  const z_r = h * lam;
+  const z_i = 0;
+  ctx.beginPath();
+  ctx.arc(cx(z_r), cy(z_i), 7, 0, 2*Math.PI);
+  ctx.fillStyle = COLORS.red;
+  ctx.fill();
+  ctx.strokeStyle = 'white'; ctx.lineWidth=1.5;
+  ctx.stroke();
+  ctx.fillStyle = 'white'; ctx.font='bold 11px JetBrains Mono';
+  ctx.fillText(`z=${z_r.toFixed(2)}`, cx(z_r)+10, cy(z_i)-6);
+
+  // Labels
+  ctx.fillStyle = COLORS.teal; ctx.font = 'bold 11px JetBrains Mono';
+  if(regionView!=='rk') ctx.fillText('Explicit Euler', cx(-1.5), cy(-1.7));
+  ctx.fillStyle = COLORS.gold;
+  if(regionView!=='rk') ctx.fillText('Implicit Euler (A-stable)', cx(-3.2), cy(2.2));
+  ctx.fillStyle = COLORS.purple;
+  if(regionView!=='euler') ctx.fillText('RK4', cx(-2.5), cy(1.5));
+}
+
+function rk4Amp(rx, iy) {
+  // R(z) = 1 + z + z²/2 + z³/6 + z⁴/24, z = rx + iy
+  // Complex arithmetic
+  let re=1+rx, im=iy;
+  // + z²/2
+  const z2r = (rx*rx - iy*iy)/2;
+  const z2i = (2*rx*iy)/2;
+  re+=z2r; im+=z2i;
+  // + z³/6
+  const z3r = (rx*(rx*rx-3*iy*iy) - iy*(3*rx*rx-iy*iy)*0)/6;
+  const z3i = (iy*(3*rx*rx-iy*iy))/6;
+  const zr3 = rx*rx*rx - 3*rx*iy*iy;
+  const zi3 = 3*rx*rx*iy - iy*iy*iy;
+  re+=zr3/6; im+=zi3/6;
+  // + z⁴/24
+  const zr4 = rx*(rx*rx*rx - 3*rx*iy*iy) - iy*(3*rx*rx*iy - iy*iy*iy);
+  const zi4 = rx*(3*rx*rx*iy - iy*iy*iy) + iy*(rx*rx*rx - 3*rx*iy*iy);
+  re+=zr4/24; im+=zi4/24;
+  return Math.sqrt(re*re+im*im);
+}
+
+function rk2Amp(rx, iy) {
+  // R = 1 + z + z²/2
+  const re = 1+rx + (rx*rx-iy*iy)/2;
+  const im = iy + (2*rx*iy)/2;
+  return Math.sqrt(re*re+im*im);
+}
+
+// ═══════════════════════════════════════
+// SECTION 4 — FORWARD EULER
+// ═══════════════════════════════════════
+function drawFwdEuler() {
+  const lam    = parseFloat(document.getElementById('fe_lam').value);
+  const h      = parseFloat(document.getElementById('fe_h').value);
+  const nSteps = parseInt(document.getElementById('fe_steps').value);
+  document.getElementById('fe_lam_d').textContent   = lam.toFixed(1);
+  document.getElementById('fe_h_d').textContent     = h.toFixed(3);
+  document.getElementById('fe_steps_d').textContent = nSteps;
+
+  const hCrit  = 2/Math.abs(lam);
+  const R      = Math.abs(1 + h*lam);
+  const stable = R < 1;
+
+  const status = document.getElementById('fe_status');
+  status.className = 'status ' + (stable ? 'stable' : (R < 1.05 ? 'marginal' : 'unstable'));
+  status.textContent = stable
+    ? `✓ STABLE — h=${h.toFixed(3)} < h_crit=${hCrit.toFixed(3)}, |R|=${R.toFixed(4)}`
+    : `✗ UNSTABLE — h=${h.toFixed(3)} > h_crit=${hCrit.toFixed(3)}, |R|=${R.toFixed(4)}`;
+
+  // Analysis box
+  document.getElementById('fe_analysis').innerHTML =
+    `hλ = ${(h*lam).toFixed(4)}<br>` +
+    `|1 + hλ| = ${R.toFixed(4)}<br>` +
+    `h_critical = 2/|λ| = ${hCrit.toFixed(4)}<br>` +
+    `<span style="color:${stable?COLORS.green:COLORS.red}">${stable?'✓ h < h_crit → stable':'✗ h > h_crit → diverges!'}</span>`;
+
+  const t = [0], y = [1];
+  for(let i=0;i<nSteps;i++) {
+    y.push(y[i] + h*lam*y[i]);
+    t.push(t[i]+h);
+  }
+  const tMax = t[t.length-1];
+  const tExact = Array.from({length:300}, (_,i)=>i/299*tMax);
+  const yExact = tExact.map(tv=>Math.exp(lam*tv));
+
+  const allY = [...y, ...yExact].filter(v=>isFinite(v)&&Math.abs(v)<15);
+  const yMin = Math.min(...allY,-0.2);
+  const yMax = Math.max(...allY, 1.3);
+
+  {
+    const c = document.getElementById('feCanvas');
+    const W=1060, H=400, pad={l:60,r:20,t:30,b:45};
+    const ctx = setupCanvas(c, W, H);
+    drawAxes(ctx, pad, W, H, 0, tMax, yMin, yMax, {xlabel:'t', ylabel:'y'});
+    plotLine(ctx, tExact, yExact, 0, tMax, yMin, yMax, pad, W, H, COLORS.exact, 1.5, [8,4]);
+    plotLine(ctx, t, y, 0, tMax, yMin, yMax, pad, W, H, stable ? COLORS.teal : COLORS.red, 2.5);
+    plotDots(ctx, t, y, 0, tMax, yMin, yMax, pad, W, H, COLORS.gold, 4);
+
+    // Annotate critical h
+    const pW=W-pad.l-pad.r, pH=H-pad.t-pad.b;
+    const xp = pad.l + tx(hCrit, 0, tMax, pW);
+    if(hCrit < tMax) {
+      ctx.strokeStyle='rgba(255,77,109,0.5)'; ctx.lineWidth=1; ctx.setLineDash([5,3]);
+      ctx.beginPath(); ctx.moveTo(xp,pad.t); ctx.lineTo(xp,H-pad.b); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle=COLORS.red; ctx.font='10px JetBrains Mono';
+      ctx.fillText(`h_crit = ${hCrit.toFixed(3)}`, xp+4, pad.t+18);
+    }
+    ctx.fillStyle = stable ? COLORS.teal : COLORS.red;
+    ctx.font = 'bold 11px JetBrains Mono';
+    ctx.fillText(stable ? '✓ STABLE' : '✗ DIVERGING — errors grow!', pad.l+8, pad.t+18);
+  }
+
+  // Error canvas
+  {
+    const c = document.getElementById('feErrorCanvas');
+    const W=460, H=200, pad={l:50,r:15,t:20,b:40};
+    const ctx = setupCanvas(c, W, H);
+    const errors = t.map((tv,i) => Math.abs(y[i] - Math.exp(lam*tv)));
+    const eMax = Math.max(...errors.filter(isFinite), 1e-10);
+    const eMin = 0;
+    drawAxes(ctx, pad, W, H, 0, tMax, eMin, Math.min(eMax,10), {xlabel:'t', ylabel:'|error|'});
+    plotLine(ctx, t, errors, 0, tMax, eMin, Math.min(eMax,10), pad, W, H,
+             stable ? COLORS.green : COLORS.red, 2);
+    ctx.fillStyle = stable ? COLORS.green : COLORS.red;
+    ctx.font = 'bold 10px JetBrains Mono';
+    ctx.fillText(stable ? 'Error stays bounded' : 'Error EXPLODING!', pad.l+6, pad.t+14);
+  }
+}
+
+// ═══════════════════════════════════════
+// SECTION 5 — BACKWARD EULER
+// ═══════════════════════════════════════
+function drawBwdEuler() {
+  const lam    = parseFloat(document.getElementById('be_lam').value);
+  const h      = parseFloat(document.getElementById('be_h').value);
+  const nSteps = parseInt(document.getElementById('be_steps').value);
+  document.getElementById('be_lam_d').textContent   = lam.toFixed(1);
+  document.getElementById('be_h_d').textContent     = h.toFixed(3);
+  document.getElementById('be_steps_d').textContent = nSteps;
+
+  const hCrit = 2/Math.abs(lam);
+  const RFwd  = Math.abs(1 + h*lam);
+
+  const tBE=[0], yBE=[1];
+  for(let i=0;i<nSteps;i++) {
+    yBE.push(yBE[i]/(1 - h*lam));
+    tBE.push(tBE[i]+h);
+  }
+  const tFE=[0], yFE=[1];
+  for(let i=0;i<nSteps;i++) {
+    yFE.push(yFE[i]*(1 + h*lam));
+    tFE.push(tFE[i]+h);
+  }
+  const tMax = tBE[tBE.length-1];
+  const tExact = Array.from({length:400}, (_,i) => i/399*tMax);
+  const yExact = tExact.map(tv => Math.exp(lam*tv));
+
+  const allY = [...yBE, ...yExact].filter(v=>isFinite(v)&&Math.abs(v)<5);
+  const yMin = Math.min(...allY,-0.2);
+  const yMax = Math.max(...allY, 1.3);
+
+  {
+    const c = document.getElementById('beCanvas');
+    const W=1060, H=400, pad={l:60,r:20,t:30,b:45};
+    const ctx = setupCanvas(c, W, H);
+    drawAxes(ctx, pad, W, H, 0, tMax, yMin, yMax, {xlabel:'t', ylabel:'y'});
+    plotLine(ctx, tExact, yExact, 0, tMax, yMin, yMax, pad, W, H, COLORS.exact, 1.5, [8,4]);
+
+    // FE (unstable line)
+    if(RFwd > 1) {
+      plotLine(ctx, tFE, yFE, 0, tMax, yMin, yMax, pad, W, H, 'rgba(255,77,109,0.5)', 1.5);
+    }
+    plotLine(ctx, tBE, yBE, 0, tMax, yMin, yMax, pad, W, H, COLORS.teal, 2.5);
+    plotDots(ctx, tBE, yBE, 0, tMax, yMin, yMax, pad, W, H, COLORS.teal, 4);
+
+    const pW=W-pad.l-pad.r, pH=H-pad.t-pad.b;
+    ctx.fillStyle = COLORS.teal;
+    ctx.font = 'bold 11px JetBrains Mono';
+    ctx.fillText('✓ Backward Euler — ALWAYS STABLE (A-stable)', pad.l+8, pad.t+18);
+
+    if(RFwd > 1) {
+      ctx.fillStyle = COLORS.red;
+      ctx.font = '10px JetBrains Mono';
+      ctx.fillText(`(Forward Euler would diverge here: |R|=${RFwd.toFixed(3)})`, pad.l+8, pad.t+34);
+    }
+  }
+}
+
+// ═══════════════════════════════════════
+// SECTION 6 — RK COMPARISON
+// ═══════════════════════════════════════
+function drawRK() {
+  const lam    = parseFloat(document.getElementById('rk_lam').value);
+  const h      = parseFloat(document.getElementById('rk_h').value);
+  const nSteps = parseInt(document.getElementById('rk_steps').value);
+  document.getElementById('rk_lam_d').textContent   = lam.toFixed(1);
+  document.getElementById('rk_h_d').textContent     = h.toFixed(2);
+  document.getElementById('rk_steps_d').textContent = nSteps;
+
+  const z = h * lam;
+  const Rrk2 = Math.abs(1 + z + z*z/2);
+  const Rrk4 = Math.abs(1 + z + z*z/2 + z*z*z/6 + z*z*z*z/24);
+
+  const status = document.getElementById('rk_status');
+  const rk4stable = Rrk4 < 1, rk2stable = Rrk2 < 1;
+  status.className = 'status ' + (rk4stable ? 'stable' : (rk2stable ? 'marginal' : 'unstable'));
+  status.textContent = `z = hλ = ${z.toFixed(3)} | RK2: |R|=${Rrk2.toFixed(4)} ${rk2stable?'✓':'✗'} | RK4: |R|=${Rrk4.toFixed(4)} ${rk4stable?'✓':'✗'}`;
+
+  // Draw RK2 region
+  drawRKRegion('rk2RegionCanvas', 2, 520, 400);
+  drawRKRegion('rk4RegionCanvas', 4, 520, 400);
+
+  // Draw comparison plot
+  const t=[0], y2=[1], y4=[1];
+  for(let i=0;i<nSteps;i++) {
+    const y2i=y2[i];
+    const y4i=y4[i];
+    // RK2 (midpoint)
+    const k1_2=lam*y2i, k2_2=lam*(y2i+0.5*h*k1_2);
+    y2.push(y2i+h*k2_2);
+    // RK4
+    const k1=lam*y4i, k2=lam*(y4i+0.5*h*k1), k3=lam*(y4i+0.5*h*k2), k4=lam*(y4i+h*k3);
+    y4.push(y4i+h/6*(k1+2*k2+2*k3+k4));
+    t.push(t[i]+h);
+  }
+  const tMax=t[t.length-1];
+  const tEx=Array.from({length:300},(_,i)=>i/299*tMax);
+  const yEx=tEx.map(tv=>Math.exp(lam*tv));
+
+  const allY=[...y2,...y4,...yEx].filter(v=>isFinite(v)&&Math.abs(v)<10);
+  const yMin=Math.min(...allY,-0.2), yMax=Math.max(...allY,1.3);
+
+  {
+    const c=document.getElementById('rkCanvas');
+    const W=1060,H=380,pad={l:60,r:20,t:30,b:45};
+    const ctx=setupCanvas(c,W,H);
+    drawAxes(ctx,pad,W,H,0,tMax,yMin,yMax,{xlabel:'t',ylabel:'y'});
+    plotLine(ctx,tEx,yEx,0,tMax,yMin,yMax,pad,W,H,COLORS.exact,1.5,[8,4]);
+    plotLine(ctx,t,y2,0,tMax,yMin,yMax,pad,W,H,COLORS.purple,2);
+    plotLine(ctx,t,y4,0,tMax,yMin,yMax,pad,W,H,COLORS.gold,2.5);
+    plotDots(ctx,t,y2,0,tMax,yMin,yMax,pad,W,H,COLORS.purple,3.5);
+    plotDots(ctx,t,y4,0,tMax,yMin,yMax,pad,W,H,COLORS.gold,3.5);
+  }
+}
+
+function drawRKRegion(canvasId, order, W, H) {
+  const c = document.getElementById(canvasId);
+  const pad={l:40,r:15,t:20,b:40};
+  const ctx = setupCanvas(c, W, H);
+  const pW=W-pad.l-pad.r, pH=H-pad.t-pad.b;
+
+  ctx.fillStyle = COLORS.bg; ctx.fillRect(0,0,W,H);
+
+  const xMin=-3.5, xMax=1.5, yMin=-3, yMax=3;
+  const cx=v=>pad.l+tx(v,xMin,xMax,pW);
+  const cy=v=>pad.t+ty(v,yMin,yMax,pH);
+
+  ctx.strokeStyle=COLORS.grid; ctx.lineWidth=1;
+  [-3,-2,-1,0,1].forEach(v=>{
+    const xp=cx(v); ctx.beginPath();ctx.moveTo(xp,pad.t);ctx.lineTo(xp,H-pad.b);ctx.stroke();
+    ctx.fillStyle=COLORS.muted; ctx.font='9px JetBrains Mono'; ctx.fillText(v,xp-6,H-pad.b+12);
+  });
+  [-2,-1,0,1,2].forEach(v=>{
+    const yp=cy(v); ctx.beginPath();ctx.moveTo(pad.l,yp);ctx.lineTo(W-pad.r,yp);ctx.stroke();
+  });
+
+  // Axes
+  ctx.strokeStyle=COLORS.axis; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(cx(0),pad.t); ctx.lineTo(cx(0),H-pad.b); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(pad.l,cy(0)); ctx.lineTo(W-pad.r,cy(0)); ctx.stroke();
+
+  // Fill stability region
+  const imgData = ctx.createImageData(pW|0, pH|0);
+  const color = order===2 ? [167,139,250] : [240,165,0];
+  for(let xi=0;xi<(pW|0);xi++) {
+    for(let yi=0;yi<(pH|0);yi++) {
+      const rx=xMin+xi/pW*(xMax-xMin);
+      const iy=yMax-yi/pH*(yMax-yMin);
+      const amp=order===2?rk2Amp(rx,iy):rk4Amp(rx,iy);
+      if(amp<=1){
+        const idx=(yi*(pW|0)+xi)*4;
+        imgData.data[idx]=color[0]; imgData.data[idx+1]=color[1];
+        imgData.data[idx+2]=color[2]; imgData.data[idx+3]=90;
+      }
+    }
+  }
+  ctx.putImageData(imgData, pad.l, pad.t);
+
+  // Current hλ point
+  const lam = parseFloat(document.getElementById('rk_lam').value);
+  const h   = parseFloat(document.getElementById('rk_h').value);
+  const z   = h*lam;
+  ctx.beginPath();
+  ctx.arc(cx(z), cy(0), 6, 0, 2*Math.PI);
+  ctx.fillStyle = COLORS.red; ctx.fill();
+  ctx.strokeStyle='white'; ctx.lineWidth=1.5; ctx.stroke();
+
+  ctx.fillStyle = order===2?COLORS.purple:COLORS.gold;
+  ctx.font='bold 11px JetBrains Mono';
+  ctx.fillText(`RK${order} Stability Region`, pad.l+8, pad.t+16);
+
+  const hCrit = order===2?2/Math.abs(lam):2.79/Math.abs(lam);
+  ctx.fillStyle=COLORS.muted; ctx.font='10px JetBrains Mono';
+  ctx.fillText(`h_crit ≈ ${hCrit.toFixed(3)}`, pad.l+8, pad.t+30);
+}
+
+// ═══════════════════════════════════════
+// SECTION 7 — ALL METHODS
+// ═══════════════════════════════════════
+function drawAllMethods() {
+  const lam    = parseFloat(document.getElementById('all_lam').value);
+  const h      = parseFloat(document.getElementById('all_h').value);
+  const nSteps = parseInt(document.getElementById('all_steps').value);
+  document.getElementById('all_lam_d').textContent   = lam.toFixed(0);
+  document.getElementById('all_h_d').textContent     = h.toFixed(3);
+  document.getElementById('all_steps_d').textContent = nSteps;
+
+  const hCritFE  = 2/Math.abs(lam);
+  const hCritRK2 = 2/Math.abs(lam);
+  const hCritRK4 = 2.79/Math.abs(lam);
+
+  const zFE  = Math.abs(1 + h*lam);
+  const zRK4 = Math.abs(1 + h*lam + (h*lam)**2/2 + (h*lam)**3/6 + (h*lam)**4/24);
+  const zRK2 = Math.abs(1 + h*lam + (h*lam)**2/2);
+
+  const feSt  = zFE  < 1;
+  const rk2St = zRK2 < 1;
+  const rk4St = zRK4 < 1;
+
+  const setS = (id, st, label) => {
+    const el = document.getElementById(id);
+    el.className = 'status ' + (st ? 'stable' : 'unstable');
+    el.textContent = label + ': ' + (st ? '✓ Stable' : '✗ Unstable');
+    el.style.margin = '0';
+  };
+  setS('all_fe_status',  feSt,  'FE');
+  setS('all_be_status',  true,  'BE');
+  setS('all_rk2_status', rk2St, 'RK2');
+  setS('all_rk4_status', rk4St, 'RK4');
+
+  document.getElementById('all_crit_info').innerHTML =
+    `λ = ${lam}, h = ${h.toFixed(3)}, hλ = ${(h*lam).toFixed(3)}<br>` +
+    `FE h_crit = ${hCritFE.toFixed(4)} | RK4 h_crit = ${hCritRK4.toFixed(4)}`;
+
+  // Table values
+  const setT = (id, val) => { const el=document.getElementById(id); if(el) el.textContent=val; };
+  setT('fe_crit',     hCritFE.toFixed(4));
+  setT('fe_h_curr',   h.toFixed(3));
+  setT('rk2_crit',    hCritRK2.toFixed(4));
+  setT('rk2_h_curr',  h.toFixed(3));
+  setT('rk4_crit',    hCritRK4.toFixed(4));
+  setT('rk4_h_curr',  h.toFixed(3));
+  setT('be_h_curr',   h.toFixed(3));
+
+  const setTS = (id, stable) => {
+    const el=document.getElementById(id);
+    if(el){ el.className = stable?'ok':'bad'; el.textContent = stable?'✓ Stable':'✗ Unstable'; }
+  };
+  setTS('fe_crit_stat',  feSt);
+  setTS('rk2_crit_stat', rk2St);
+  setTS('rk4_crit_stat', rk4St);
+
+  // Simulate all methods
+  const t=[0], yFE=[1], yBE=[1], yRK2=[1], yRK4=[1];
+  for(let i=0;i<nSteps;i++){
+    yFE.push(yFE[i]*(1+h*lam));
+    yBE.push(yBE[i]/(1-h*lam));
+    const k1_2=lam*yRK2[i], k2_2=lam*(yRK2[i]+0.5*h*k1_2);
+    yRK2.push(yRK2[i]+h*k2_2);
+    const k1=lam*yRK4[i], k2=lam*(yRK4[i]+0.5*h*k1), k3=lam*(yRK4[i]+0.5*h*k2), k4=lam*(yRK4[i]+h*k3);
+    yRK4.push(yRK4[i]+h/6*(k1+2*k2+2*k3+k4));
+    t.push(t[i]+h);
+  }
+  const tMax=t[t.length-1];
+  const tEx=Array.from({length:400},(_,i)=>i/399*tMax);
+  const yEx=tEx.map(tv=>Math.exp(lam*tv));
+
+  const safeY=[...yBE,...yRK2,...yRK4,...yEx].filter(v=>isFinite(v)&&Math.abs(v)<10);
+  const yMin=Math.min(...safeY,-0.2), yMax=Math.max(...safeY,1.3);
+
+  const c=document.getElementById('allCanvas');
+  const W=1060, H=440, pad={l:60,r:20,t:30,b:45};
+  const ctx=setupCanvas(c,W,H);
+  drawAxes(ctx,pad,W,H,0,tMax,yMin,yMax,{xlabel:'t',ylabel:'y'});
+  plotLine(ctx,tEx,yEx,0,tMax,yMin,yMax,pad,W,H,COLORS.exact,1.5,[8,4]);
+  plotLine(ctx,t,yBE,0,tMax,yMin,yMax,pad,W,H,COLORS.teal,2.5);
+  plotLine(ctx,t,yRK2,0,tMax,yMin,yMax,pad,W,H,COLORS.purple,2);
+  plotLine(ctx,t,yRK4,0,tMax,yMin,yMax,pad,W,H,COLORS.gold,2);
+  if(feSt) plotLine(ctx,t,yFE,0,tMax,yMin,yMax,pad,W,H,COLORS.red,2);
+  else {
+    const safeYFE=yFE.filter((v,i)=>Math.abs(v)<yMax*1.5);
+    const safeTFE=t.filter((v,i)=>Math.abs(yFE[i])<yMax*1.5);
+    plotLine(ctx,safeTFE,safeYFE.slice(0,safeTFE.length),0,tMax,yMin,yMax,pad,W,H,'rgba(255,77,109,0.7)',2);
+  }
+  plotDots(ctx,t,yBE,0,tMax,yMin,yMax,pad,W,H,COLORS.teal,3.5);
+  plotDots(ctx,t,yRK2,0,tMax,yMin,yMax,pad,W,H,COLORS.purple,3);
+  plotDots(ctx,t,yRK4,0,tMax,yMin,yMax,pad,W,H,COLORS.gold,3.5);
+}
+
+// ═══════════════════════════════════════
+// SECTION 8 — PRACTICE EXAMPLE
+// ═══════════════════════════════════════
+function drawPractice() {
+  const canvas = document.getElementById('s8canvas');
+  if (!canvas) return;
+  const lam = -50, h = 0.1, y0 = 1;
+  const n = 4;
+  const t = [], yFE = [];
+  t.push(0); yFE.push(y0);
+  for (let i = 0; i < n; i++) { t.push(t[i] + h); yFE.push(yFE[i] * (1 + h * lam)); }
+  const tEx = Array.from({length: 300}, (_, i) => i / 299 * (n * h));
+  const yEx = tEx.map(tv => Math.exp(lam * tv));
+
+  const W = 500, H = 300, pad = {l: 55, r: 20, t: 30, b: 45};
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const pW = W - pad.l - pad.r, pH = H - pad.t - pad.b;
+  const xMin = 0, xMax = n * h;
+  // clamp y range so unstable values don't dominate the scale
+  const displayMax = 5, displayMin = -5;
+  const yMin = displayMin, yMax = displayMax;
+  const cx = v => pad.l + (v - xMin) / (xMax - xMin) * pW;
+  const cy = v => pad.t + (1 - (Math.max(yMin, Math.min(yMax, v)) - yMin) / (yMax - yMin)) * pH;
+
+  // Background + grid
+  ctx.fillStyle = '#030b18'; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(26,48,85,0.6)'; ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const x = pad.l + i / 5 * pW;
+    ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, H - pad.b); ctx.stroke();
+    const y = pad.t + i / 5 * pH;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+  }
+  // y=0 line
+  ctx.strokeStyle = 'rgba(120,140,168,0.4)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(pad.l, cy(0)); ctx.lineTo(W - pad.r, cy(0)); ctx.stroke();
+
+  // Axis labels
+  ctx.fillStyle = '#7a8fa8'; ctx.font = '10px JetBrains Mono';
+  [0, 0.1, 0.2, 0.3, 0.4].forEach((v, i) => ctx.fillText(v.toFixed(1), cx(v) - 8, H - pad.b + 14));
+  ctx.fillText('t', W - pad.r + 4, H - pad.b + 4);
+  ctx.fillText('y', pad.l - 14, pad.t - 4);
+
+  // Exact solution
+  ctx.beginPath(); ctx.strokeStyle = 'rgba(200,216,232,0.7)'; ctx.lineWidth = 1.5;
+  ctx.setLineDash([7, 4]);
+  tEx.forEach((tv, i) => { if (i === 0) ctx.moveTo(cx(tv), cy(yEx[i])); else ctx.lineTo(cx(tv), cy(yEx[i])); });
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // FE line (clipped)
+  ctx.beginPath(); ctx.strokeStyle = COLORS.red; ctx.lineWidth = 2;
+  t.forEach((tv, i) => {
+    const yv = Math.max(yMin, Math.min(yMax, yFE[i]));
+    if (i === 0) ctx.moveTo(cx(tv), cy(yv)); else ctx.lineTo(cx(tv), cy(yv));
+  });
+  ctx.stroke();
+
+  // Dots with labels
+  t.forEach((tv, i) => {
+    const yv = yFE[i];
+    const isClipped = yv < yMin || yv > yMax;
+    const yDisp = Math.max(yMin, Math.min(yMax, yv));
+    ctx.beginPath(); ctx.arc(cx(tv), cy(yDisp), 6, 0, 2 * Math.PI);
+    ctx.fillStyle = COLORS.gold; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+    // Label
+    ctx.fillStyle = COLORS.gold; ctx.font = 'bold 11px JetBrains Mono';
+    const labelY = cy(yDisp) + (yDisp > 0 ? -12 : 16);
+    ctx.fillText(`y${i}=${yv}${isClipped ? ' ↑' : ''}`, cx(tv) + 6, labelY);
+  });
+
+  // Legend
+  ctx.fillStyle = 'rgba(200,216,232,0.7)'; ctx.font = '10px JetBrains Mono';
+  ctx.fillText('── Exact e^(λt)', pad.l + 6, pad.t + 16);
+  ctx.fillStyle = COLORS.red;
+  ctx.fillText('── FE (clipped at ±5)', pad.l + 6, pad.t + 30);
+  ctx.fillStyle = COLORS.red; ctx.font = 'bold 11px JetBrains Mono';
+  ctx.fillText('✗ UNSTABLE  |R(z)| = 4', W - 180, pad.t + 16);
+}
+
+// ═══════════════════════════════════════
+// LIVE SLIDER UPDATES
+// ═══════════════════════════════════════
+function bindSliders(ids, callback) {
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('input', callback);
+  });
+}
+
+bindSliders(['stiff_lam'], () => window.drawStiffPlot());
+bindSliders(['amp_lam','amp_h'], () => window.drawAmpFactor());
+bindSliders(['reg_lam','reg_h'], drawRegionPlot);
+bindSliders(['fe_lam','fe_h','fe_steps'], () => window.drawFwdEuler());
+bindSliders(['be_lam','be_h','be_steps'], () => window.drawBwdEuler());
+bindSliders(['rk_lam','rk_h','rk_steps'], () => window.drawRK());
+bindSliders(['all_lam','all_h','all_steps'], () => window.drawAllMethods());
+
+// ═══════════════════════════════════════
+// HOVER TOOLTIP & CROSSHAIR SYSTEM
+// ═══════════════════════════════════════
+
+// Global tooltip element
+const _tooltip = document.createElement('div');
+_tooltip.id = '_hover_tooltip';
+_tooltip.style.cssText = `
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  background: rgba(4,13,26,0.97);
+  border: 1px solid rgba(240,165,0,0.5);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #f0f6ff;
+  line-height: 1.7;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  display: none;
+  min-width: 140px;
+  backdrop-filter: blur(8px);
+`;
+document.body.appendChild(_tooltip);
+
+/**
+ * Register a canvas for hover crosshair + tooltip.
+ * @param {string} canvasId  – id of the <canvas>
+ * @param {object} plotMeta  – { xMin, xMax, yMin, yMax, pad, W, H, datasets }
+ *   datasets: array of { label, color, xs:[], ys:[] }
+ * The meta is provided via a getter function so it always reflects latest draw.
+ */
+function registerHover(canvasId, getMetaFn, redrawFn) {
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+
+  let hovering = false;
+  let mouseX = 0, mouseY = 0;
+
+  function getCanvasXY(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width  / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      cx: (e.clientX - rect.left) * scaleX,
+      cy: (e.clientY - rect.top)  * scaleY,
+      clientX: e.clientX,
+      clientY: e.clientY
+    };
+  }
+
+  function drawOverlay(e) {
+    const meta = getMetaFn();
+    if(!meta) return;
+    const { xMin, xMax, yMin, yMax, pad, W, H, datasets } = meta;
+    const pW = W - pad.l - pad.r;
+    const pH = H - pad.t - pad.b;
+
+    const {cx, cy, clientX, clientY} = getCanvasXY(e);
+
+    // Only inside plot area
+    const dpr = window.devicePixelRatio || 1;
+    const plotX = cx / dpr, plotY = cy / dpr;
+
+    if(plotX < pad.l || plotX > W - pad.r || plotY < pad.t || plotY > H - pad.b) {
+      _tooltip.style.display = 'none';
+      // redraw without overlay
+      redrawFn();
+      return;
+    }
+
+    // Compute data coordinates
+    const dataX = xMin + (plotX - pad.l) / pW * (xMax - xMin);
+    const dataY = yMax - (plotY - pad.t) / pH * (yMax - yMin);
+
+    // Find nearest points from each dataset
+    let lines = [];
+    datasets.forEach(ds => {
+      if(!ds.xs || !ds.ys || ds.xs.length === 0) return;
+      // Find closest x index
+      let bestIdx = 0, bestDist = Infinity;
+      ds.xs.forEach((x, i) => {
+        const d = Math.abs(x - dataX);
+        if(d < bestDist) { bestDist = d; bestIdx = i; }
+      });
+      const nearY = ds.ys[bestIdx];
+      const nearX = ds.xs[bestIdx];
+      if(isFinite(nearY)) {
+        lines.push({ label: ds.label, color: ds.color, x: nearX, y: nearY });
+      }
+    });
+
+    // Redraw base
+    redrawFn();
+
+    // Draw crosshair overlay
+    const ctx = canvas.getContext('2d');
+    ctx.save();
+    const s = window.devicePixelRatio || 1;
+    ctx.scale(s, s);
+
+    const px = plotX, py = plotY;
+
+    // Vertical line
+    ctx.strokeStyle = 'rgba(240,165,0,0.45)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(px, pad.t);
+    ctx.lineTo(px, H - pad.b);
+    ctx.stroke();
+
+    // Horizontal line
+    ctx.beginPath();
+    ctx.moveTo(pad.l, py);
+    ctx.lineTo(W - pad.r, py);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw snap dots for each dataset at their nearest x
+    lines.forEach(ds => {
+      const dotX = pad.l + (ds.x - xMin) / (xMax - xMin) * pW;
+      const dotY = pad.t + (1 - (ds.y - yMin) / (yMax - yMin)) * pH;
+      if(dotY < pad.t || dotY > H - pad.b) return;
+      ctx.beginPath();
+      ctx.arc(dotX, dotY, 5, 0, 2*Math.PI);
+      ctx.fillStyle = ds.color;
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    });
+
+    // Axis value labels
+    ctx.fillStyle = 'rgba(240,165,0,0.9)';
+    ctx.font = `bold ${10 * s}px JetBrains Mono`;
+    ctx.save();
+    ctx.scale(1/s, 1/s);
+
+    // x label on x-axis
+    const xLabelX = px * s;
+    const xLabelY = (H - pad.b + 16) * s;
+    ctx.fillStyle = 'rgba(4,13,26,0.85)';
+    ctx.fillRect(xLabelX - 28, xLabelY - 12, 56, 16);
+    ctx.fillStyle = 'rgba(240,165,0,0.95)';
+    ctx.textAlign = 'center';
+    ctx.fillText(dataX.toFixed(3), xLabelX, xLabelY);
+
+    // y label on y-axis
+    const yLabelX = (pad.l - 4) * s;
+    const yLabelY = py * s;
+    ctx.fillStyle = 'rgba(4,13,26,0.85)';
+    ctx.fillRect(yLabelX - 48, yLabelY - 8, 46, 16);
+    ctx.fillStyle = 'rgba(240,165,0,0.95)';
+    ctx.textAlign = 'right';
+    ctx.fillText(dataY.toFixed(4), yLabelX - 2, yLabelY + 4);
+
+    ctx.restore();
+    ctx.restore();
+
+    // Build tooltip HTML
+    if(lines.length > 0) {
+      let html = `<div style="color:#f0a500;font-size:11px;margin-bottom:4px;letter-spacing:1px;">t = ${dataX.toFixed(4)}</div>`;
+      lines.forEach(ds => {
+        html += `<div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${ds.color};flex-shrink:0;display:inline-block;"></span>
+          <span style="color:#7a8fa8;font-size:11px;">${ds.label}:</span>
+          <span style="color:#f0f6ff;font-weight:600;">${ds.y.toFixed(5)}</span>
+        </div>`;
+      });
+      _tooltip.innerHTML = html;
+      _tooltip.style.display = 'block';
+
+      // Position tooltip
+      const tw = 200, th = 30 + lines.length * 22;
+      let tx = clientX + 16;
+      let ty = clientY - th / 2;
+      if(tx + tw > window.innerWidth) tx = clientX - tw - 10;
+      if(ty < 4) ty = 4;
+      if(ty + th > window.innerHeight) ty = window.innerHeight - th - 4;
+      _tooltip.style.left = tx + 'px';
+      _tooltip.style.top  = ty + 'px';
+    } else {
+      _tooltip.style.display = 'none';
+    }
+  }
+
+  // Click-based: show tooltip only when user clicks near a data point
+  canvas.style.cursor = 'crosshair';
+  canvas.addEventListener('click', drawOverlay);
+
+  // Click anywhere outside canvas to dismiss tooltip
+  document.addEventListener('click', (e) => {
+    if (e.target !== canvas) {
+      _tooltip.style.display = 'none';
+    }
+  });
+}
+
+// ── Store last-drawn metadata for each canvas ──
+const _canvasMeta = {};
+
+function storeMeta(canvasId, meta) {
+  _canvasMeta[canvasId] = meta;
+}
+
+// ── Patch utility: enhanced plotLine that also stores data ──
+// We extend the existing draw functions to call storeMeta after drawing.
+// We do this by wrapping them.
+
+function wrapDraw(fn) {
+  return function() {
+    fn.apply(this, arguments);
+    // after draw, register hovers for canvases in this section
+    // (hovers self-register on first mousemove using _canvasMeta)
+  };
+}
+
+// ═══════════════════════════════════════
+// PER-CANVAS HOVER REGISTRATIONS
+// After each draw function populates _canvasMeta, register hover.
+// We patch each draw to store meta before returning.
+// ═══════════════════════════════════════
+
+// ── Section 1: Stiff plot ──
+const _orig_drawStiffPlot = drawStiffPlot;
+window.drawStiffPlot = function() {
+  _orig_drawStiffPlot();
+  const lam = parseFloat(document.getElementById('stiff_lam').value);
+  const N = 600;
+  const tFast = Array.from({length:N}, (_,i) => i/(N-1)*0.015);
+  const yFast = tFast.map(t => Math.exp(-t) - Math.exp(lam*t));
+  const tSlow = Array.from({length:N}, (_,i) => i/(N-1)*10);
+  const ySlow = tSlow.map(t => Math.exp(-t) - Math.exp(lam*t));
+  _canvasMeta['stiffC1'] = {
+    xMin:0, xMax:0.015, yMin:Math.min(...yFast)-0.05, yMax:Math.max(...yFast)+0.05,
+    pad:{l:55,r:20,t:30,b:45}, W:520, H:360,
+    datasets:[{label:'y(t)',color:COLORS.gold,xs:tFast,ys:yFast}]
+  };
+  _canvasMeta['stiffC2'] = {
+    xMin:0, xMax:10, yMin:-0.1, yMax:1.1,
+    pad:{l:55,r:20,t:30,b:45}, W:520, H:360,
+    datasets:[{label:'y(t)',color:COLORS.teal,xs:tSlow,ys:ySlow}]
+  };
+};
+
+// ── Section 2: Amplification factor ──
+const _orig_drawAmpFactor = drawAmpFactor;
+window.drawAmpFactor = function() {
+  _orig_drawAmpFactor();
+  const lam = parseFloat(document.getElementById('amp_lam').value);
+  const h   = parseFloat(document.getElementById('amp_h').value);
+  const nSteps = 35;
+  const t = Array.from({length:nSteps+1}, (_,i) => i*h);
+  const tExact = Array.from({length:300}, (_,i) => i/299*nSteps*h);
+  const yExact = tExact.map(tv => Math.exp(lam*tv));
+  let yNum = [1];
+  const method = typeof ampMethod !== 'undefined' ? ampMethod : 'fe';
+  for(let i=0;i<nSteps;i++) {
+    if(method==='fe') yNum.push(yNum[i]*(1+h*lam));
+    else if(method==='be') yNum.push(yNum[i]/(1-h*lam));
+    else {
+      const yi=yNum[i], k1=lam*yi, k2=lam*(yi+.5*h*k1), k3=lam*(yi+.5*h*k2), k4=lam*(yi+h*k3);
+      yNum.push(yi+h/6*(k1+2*k2+2*k3+k4));
+    }
+  }
+  const allY=[...yNum,...yExact].filter(v=>isFinite(v)&&Math.abs(v)<20);
+  const yMin=Math.min(...allY,-0.5), yMax=Math.max(...allY,1.2);
+  const xMax=nSteps*h;
+  const stable = Math.abs(method==='fe'?1+h*lam:method==='be'?1/(1-h*lam):1) < 1;
+  _canvasMeta['ampCanvas'] = {
+    xMin:0, xMax, yMin, yMax,
+    pad:{l:55,r:20,t:30,b:45}, W:520, H:360,
+    datasets:[
+      {label:'Exact',  color:COLORS.exact,xs:tExact,ys:yExact},
+      {label:'Numerical',color:stable?COLORS.teal:COLORS.red,xs:t,ys:yNum}
+    ]
+  };
+};
+
+// ── Section 4: Forward Euler ──
+const _orig_drawFwdEuler = drawFwdEuler;
+window.drawFwdEuler = function() {
+  _orig_drawFwdEuler();
+  const lam = parseFloat(document.getElementById('fe_lam').value);
+  const h   = parseFloat(document.getElementById('fe_h').value);
+  const nSteps = parseInt(document.getElementById('fe_steps').value);
+  const t=[0], y=[1];
+  for(let i=0;i<nSteps;i++){t.push(t[i]+h);y.push(y[i]*(1+h*lam));}
+  const tEx=Array.from({length:300},(_,i)=>i/299*t[t.length-1]);
+  const yEx=tEx.map(tv=>Math.exp(lam*tv));
+  const allY=[...y,...yEx].filter(v=>isFinite(v)&&Math.abs(v)<15);
+  const yMin=Math.min(...allY,-0.5), yMax=Math.max(...allY,1.3);
+  const stable=Math.abs(1+h*lam)<1;
+  _canvasMeta['feCanvas'] = {
+    xMin:0, xMax:t[t.length-1], yMin, yMax,
+    pad:{l:60,r:20,t:30,b:45}, W:1060, H:360,
+    datasets:[
+      {label:'Exact',color:COLORS.exact,xs:tEx,ys:yEx},
+      {label:'Fwd Euler',color:stable?COLORS.gold:COLORS.red,xs:t,ys:y}
+    ]
+  };
+};
+
+// ── Section 5: Backward Euler ──
+const _orig_drawBwdEuler = drawBwdEuler;
+window.drawBwdEuler = function() {
+  _orig_drawBwdEuler();
+  const lam=parseFloat(document.getElementById('be_lam').value);
+  const h=parseFloat(document.getElementById('be_h').value);
+  const nSteps=parseInt(document.getElementById('be_steps').value);
+  const t=[0],yBE=[1];
+  for(let i=0;i<nSteps;i++){t.push(t[i]+h);yBE.push(yBE[i]/(1-h*lam));}
+  const tEx=Array.from({length:300},(_,i)=>i/299*t[t.length-1]);
+  const yEx=tEx.map(tv=>Math.exp(lam*tv));
+  const allY=[...yBE,...yEx].filter(v=>isFinite(v)&&Math.abs(v)<10);
+  const yMin=Math.min(...allY,-0.3),yMax=Math.max(...allY,1.3);
+  _canvasMeta['beCanvas'] = {
+    xMin:0, xMax:t[t.length-1], yMin, yMax,
+    pad:{l:60,r:20,t:30,b:45}, W:1060, H:400,
+    datasets:[
+      {label:'Exact',color:COLORS.exact,xs:tEx,ys:yEx},
+      {label:'Bwd Euler',color:COLORS.teal,xs:t,ys:yBE}
+    ]
+  };
+};
+
+// ── Section 6: RK comparison ──
+const _orig_drawRK = drawRK;
+window.drawRK = function() {
+  _orig_drawRK();
+  const lam=parseFloat(document.getElementById('rk_lam').value);
+  const h=parseFloat(document.getElementById('rk_h').value);
+  const nSteps=parseInt(document.getElementById('rk_steps').value);
+  const t=[0],y2=[1],y4=[1];
+  for(let i=0;i<nSteps;i++){
+    const k1_2=lam*y2[i],k2_2=lam*(y2[i]+.5*h*k1_2);y2.push(y2[i]+h*k2_2);
+    const k1=lam*y4[i],k2=lam*(y4[i]+.5*h*k1),k3=lam*(y4[i]+.5*h*k2),k4=lam*(y4[i]+h*k3);
+    y4.push(y4[i]+h/6*(k1+2*k2+2*k3+k4));
+    t.push(t[i]+h);
+  }
+  const tEx=Array.from({length:300},(_,i)=>i/299*t[t.length-1]);
+  const yEx=tEx.map(tv=>Math.exp(lam*tv));
+  const allY=[...y2,...y4,...yEx].filter(v=>isFinite(v)&&Math.abs(v)<10);
+  const yMin=Math.min(...allY,-0.2),yMax=Math.max(...allY,1.3);
+  _canvasMeta['rkCanvas'] = {
+    xMin:0, xMax:t[t.length-1], yMin, yMax,
+    pad:{l:60,r:20,t:30,b:45}, W:1060, H:380,
+    datasets:[
+      {label:'Exact',color:COLORS.exact,xs:tEx,ys:yEx},
+      {label:'RK2',  color:COLORS.purple,xs:t,ys:y2},
+      {label:'RK4',  color:COLORS.gold,  xs:t,ys:y4}
+    ]
+  };
+};
+
+// ── Section 7: All methods ──
+const _orig_drawAllMethods = drawAllMethods;
+window.drawAllMethods = function() {
+  _orig_drawAllMethods();
+  const lam=parseFloat(document.getElementById('all_lam').value);
+  const h=parseFloat(document.getElementById('all_h').value);
+  const nSteps=parseInt(document.getElementById('all_steps').value);
+  const t=[0],yFE=[1],yBE=[1],yRK2=[1],yRK4=[1];
+  for(let i=0;i<nSteps;i++){
+    yFE.push(yFE[i]*(1+h*lam));yBE.push(yBE[i]/(1-h*lam));
+    const k1_2=lam*yRK2[i],k2_2=lam*(yRK2[i]+.5*h*k1_2);yRK2.push(yRK2[i]+h*k2_2);
+    const k1=lam*yRK4[i],k2=lam*(yRK4[i]+.5*h*k1),k3=lam*(yRK4[i]+.5*h*k2),k4=lam*(yRK4[i]+h*k3);
+    yRK4.push(yRK4[i]+h/6*(k1+2*k2+2*k3+k4));
+    t.push(t[i]+h);
+  }
+  const tEx=Array.from({length:400},(_,i)=>i/399*t[t.length-1]);
+  const yEx=tEx.map(tv=>Math.exp(lam*tv));
+  const safeY=[...yBE,...yRK2,...yRK4,...yEx].filter(v=>isFinite(v)&&Math.abs(v)<10);
+  const yMin=Math.min(...safeY,-0.2),yMax=Math.max(...safeY,1.3);
+  _canvasMeta['allCanvas'] = {
+    xMin:0, xMax:t[t.length-1], yMin, yMax,
+    pad:{l:60,r:20,t:30,b:45}, W:1060, H:440,
+    datasets:[
+      {label:'Exact',color:COLORS.exact,xs:tEx,ys:yEx},
+      {label:'BE',   color:COLORS.teal,  xs:t,ys:yBE},
+      {label:'RK2',  color:COLORS.purple,xs:t,ys:yRK2},
+      {label:'RK4',  color:COLORS.gold,  xs:t,ys:yRK4},
+      {label:'FE',   color:COLORS.red,   xs:t,ys:yFE.map(v=>isFinite(v)&&Math.abs(v)<yMax*1.5?v:NaN)}
+    ]
+  };
+};
+
+// ── Register all hoverable canvases ──
+const _hoverCanvases = [
+  'stiffC1','stiffC2',
+  'ampCanvas',
+  'feCanvas',
+  'beCanvas',
+  'rkCanvas',
+  'allCanvas'
+];
+
+const _hoverRedrawMap = {
+  stiffC1:  () => window.drawStiffPlot(),
+  stiffC2:  () => window.drawStiffPlot(),
+  ampCanvas:() => window.drawAmpFactor(),
+  feCanvas: () => window.drawFwdEuler(),
+  beCanvas: () => window.drawBwdEuler(),
+  rkCanvas: () => window.drawRK(),
+  allCanvas:() => window.drawAllMethods()
+};
+
+// Lazy-register hover when canvas first becomes available
+function _setupHovers() {
+  _hoverCanvases.forEach(id => {
+    const canvas = document.getElementById(id);
+    if(!canvas || canvas._hoverRegistered) return;
+    canvas._hoverRegistered = true;
+    registerHover(
+      id,
+      () => _canvasMeta[id] || null,
+      _hoverRedrawMap[id]
+    );
+  });
+}
+
+// Call after each section switch
+const _origShowSection = window.showSection || showSection;
+window.showSection = function(id) {
+  _origShowSection(id);
+  if (id === 's8') { setTimeout(drawPractice, 60); }
+  setTimeout(_setupHovers, 100);
+};
+
+// ═══════════════════════════════════════
+// INITIAL DRAWS
+// ═══════════════════════════════════════
+window.addEventListener('load', () => {
+  window.drawStiffPlot();
+  setTimeout(() => { window.drawAmpFactor(); _setupHovers(); }, 100);
+});
+</script>
+</body>
+</html>
