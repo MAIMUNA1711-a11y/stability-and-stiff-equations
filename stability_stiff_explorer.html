@@ -1,0 +1,2048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stability &amp; Stiff Equations — Interactive Explorer</title>
+<style>
+  :root {
+    --bg: #0b1220;
+    --panel: #101a2c;
+    --panel-2: #16233a;
+    --border: #26385a;
+    --text: #e8edf5;
+    --text-muted: #92a1bd;
+    --accent-blue: #3b82f6;
+    --accent-orange: #f59e0b;
+    --stable-green: #1d9e75;
+    --stable-bg: rgba(29,158,117,0.18);
+    --unstable-red: #d85a30;
+    --unstable-bg: rgba(216,90,48,0.18);
+    --c-exact: #92a1bd;
+    --c-fe: #d85a30;
+    --c-rk2: #f59e0b;
+    --c-rk4: #1d9e75;
+    --c-be: #3b82f6;
+    --c-trap: #d4537e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 24px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  h1 {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0 0 4px;
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-orange));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle { color: var(--text-muted); font-size: 14px; margin: 0 0 20px; }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 13.5px;
+    font-weight: 500;
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    white-space: nowrap;
+  }
+  .tab-btn.active { color: var(--text); border-bottom: 2px solid var(--accent-blue); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+  .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+  label {
+    display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  select {
+    width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 10px; font-size: 14px;
+  }
+  .slider-row { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+  .slider-row label { min-width: 90px; margin-bottom: 0; }
+  input[type=range] { flex: 1; accent-color: var(--accent-blue); height: 4px; }
+  .slider-out { min-width: 100px; text-align: right; font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .preset-row { display:flex; gap:8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .preset-btn {
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 7px 12px; font-size: 13px; cursor: pointer;
+  }
+  .preset-btn:hover { border-color: var(--accent-blue); }
+
+  .plot-wrap {
+    position: relative; width: 100%; height: 380px; border-radius: 10px;
+    overflow: hidden; border: 1px solid var(--border);
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 18px; }
+  .stat-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .stat-label {
+    font-size: 11px; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 0.04em; margin: 0 0 6px;
+  }
+  .stat-value { font-size: 20px; font-weight: 600; margin: 0; font-variant-numeric: tabular-nums; }
+  .status-stable { background: var(--stable-bg) !important; border-color: var(--stable-green) !important; }
+  .status-unstable { background: var(--unstable-bg) !important; border-color: var(--unstable-red) !important; }
+  .status-stable .stat-value, .status-stable .stat-label { color: var(--stable-green); }
+  .status-unstable .stat-value, .status-unstable .stat-label { color: var(--unstable-red); }
+
+  .legend { display: flex; gap: 18px; margin-top: 14px; font-size: 13px; flex-wrap: wrap; }
+  .legend-item {
+    display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;
+    padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-2);
+  }
+  .legend-item.off { opacity: 0.4; }
+  .swatch { width: 16px; height: 3px; border-radius: 2px; display: inline-block; }
+  .swatch.dashed { background-image: linear-gradient(to right, currentColor 60%, transparent 40%); background-size: 6px 2px; height: 2px; }
+  .swatch.dot { width: 12px; height: 12px; border-radius: 3px; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .tag { display: inline-block; padding: 2px 9px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+  .tag-stable { background: rgba(29,158,117,0.18); color: var(--stable-green); }
+  .tag-unstable { background: rgba(216,90,48,0.18); color: var(--unstable-red); }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .split-panel {
+    border-radius: 12px; border: 1px solid var(--border); padding: 18px; transition: background 0.2s, border-color 0.2s;
+    background: var(--panel-2);
+  }
+  .split-panel.ok { background: var(--stable-bg); border-color: var(--stable-green); }
+  .split-panel.bad { background: var(--unstable-bg); border-color: var(--unstable-red); }
+  .split-title { font-size: 15px; font-weight: 600; margin: 0 0 2px; }
+  .split-formula { font-size: 12px; color: var(--text-muted); margin: 0 0 12px; font-family: monospace; }
+  .split-badge {
+    display: inline-block; font-size: 14px; font-weight: 700; padding: 6px 14px; border-radius: 8px; margin-bottom: 14px;
+  }
+  .split-badge.ok { background: rgba(29,158,117,0.28); color: var(--stable-green); }
+  .split-badge.bad { background: rgba(216,90,48,0.28); color: var(--unstable-red); }
+  .split-stats { display: flex; gap: 16px; font-size: 13px; margin-bottom: 14px; color: var(--text-muted); }
+  .split-stats b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .step-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 12px; }
+  .step-n { min-width: 32px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .step-bar-wrap { flex: 1; height: 14px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
+  .step-bar { height: 100%; border-radius: 4px; }
+  .step-val { min-width: 90px; text-align: right; font-variant-numeric: tabular-nums; }
+  .threshold-note {
+    margin-top: 14px; font-size: 12px; color: var(--text-muted); padding: 10px 12px;
+    background: rgba(255,255,255,0.04); border-radius: 8px; border: 1px solid var(--border);
+  }
+  .threshold-note b { color: var(--text); }
+
+  .dash-bar-wrap { width: 100%; height: 10px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; position: relative; }
+  .dash-bar { height: 100%; border-radius: 4px; }
+  .dash-marker { position: absolute; top: -3px; width: 2px; height: 16px; background: var(--text-muted); }
+
+  footer { text-align: center; color: var(--text-muted); font-size: 12px; margin-top: 20px; }
+
+  .limits-box {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 20px; margin-top: 8px; font-size: 13px; color: var(--text-muted);
+  }
+  .limits-box summary {
+    cursor: pointer; font-weight: 600; color: var(--text); font-size: 13.5px;
+    list-style: none;
+  }
+  .limits-box summary::-webkit-details-marker { display: none; }
+  .limits-list { margin: 14px 0 4px; padding-left: 20px; line-height: 1.7; }
+  .limits-list li { margin-bottom: 10px; }
+  .limits-list b { color: var(--text); }
+
+  /* Practice Problem 1 — interactive step-by-step solver */
+  .pp1-input-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr auto; gap: 14px; align-items: end; }
+  .pp1-field label { margin-bottom: 6px; }
+  .pp1-field input[type=number] {
+    width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 10px; font-size: 14px; font-variant-numeric: tabular-nums;
+  }
+  .pp1-solve-btn {
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-orange));
+    color: #0b1220; border: none; border-radius: 8px; padding: 10px 20px;
+    font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .pp1-solve-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(59,130,246,0.35); }
+  .pp1-solve-btn:active { transform: translateY(0); }
+
+  .pp1-steps { margin-top: 22px; }
+  .solve-step {
+    opacity: 0; transform: translateY(10px);
+    max-height: 0; overflow: hidden;
+    transition: opacity 0.45s ease, transform 0.45s ease, max-height 0.5s ease, margin 0.5s ease, padding 0.5s ease;
+    margin-bottom: 0;
+  }
+  .solve-step.show {
+    opacity: 1; transform: translateY(0);
+    max-height: 900px;
+    margin-bottom: 14px;
+  }
+  .step-card {
+    display: flex; gap: 14px; background: var(--panel-2); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent-blue); border-radius: 10px; padding: 14px 18px;
+  }
+  .step-card.flash { animation: stepFlash 0.9s ease; }
+  @keyframes stepFlash {
+    0% { box-shadow: 0 0 0 0 rgba(59,130,246,0.55); }
+    100% { box-shadow: 0 0 0 14px rgba(59,130,246,0); }
+  }
+  .step-num {
+    flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+    background: var(--accent-blue); color: #0b1220; font-weight: 700; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step-body { flex: 1; min-width: 0; }
+  .step-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin: 0 0 6px; font-weight: 600; }
+  .step-content { font-size: 15px; margin: 0; line-height: 1.6; }
+  .step-content .math { font-family: monospace; font-size: 16px; }
+  .step-content .sub { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+  .step-card.stable-card { border-left-color: var(--stable-green); }
+  .step-card.unstable-card { border-left-color: var(--unstable-red); }
+  .step-card.neutral-card { border-left-color: var(--accent-orange); }
+  .step-num.stable-num { background: var(--stable-green); }
+  .step-num.unstable-num { background: var(--unstable-red); }
+  .step-num.neutral-num { background: var(--accent-orange); }
+
+  .verdict-badge {
+    display: inline-block; font-size: 16px; font-weight: 800; padding: 6px 16px;
+    border-radius: 8px; margin-bottom: 8px; letter-spacing: 0.02em;
+  }
+  .verdict-badge.stable { background: rgba(29,158,117,0.22); color: var(--stable-green); }
+  .verdict-badge.unstable { background: rgba(216,90,48,0.22); color: var(--unstable-red); }
+  .verdict-badge.neutral { background: rgba(245,158,11,0.22); color: var(--accent-orange); }
+
+  .pp1-table-wrap { max-height: 260px; overflow-y: auto; border-radius: 8px; }
+  .pp1-table-wrap table { margin-top: 0; }
+  .pp1-table-wrap th { position: sticky; top: 0; background: var(--panel-2); }
+  .row-diverge { color: var(--unstable-red); font-weight: 600; }
+
+  .pp1-plot-wrap { position: relative; width: 100%; height: 340px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); margin-top: 4px; }
+  .pp2-plot-wrap { position: relative; width: 100%; height: 300px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); margin-top: 8px; }
+
+  /* Practice Problem 2 — stiffness analysis */
+  .pp2-input-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 14px; align-items: end; }
+  .pp2-field input[type=number] {
+    width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 10px; font-size: 14px; font-variant-numeric: tabular-nums;
+  }
+  .pp2-analyze-btn {
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-orange));
+    color: #0b1220; border: none; border-radius: 8px; padding: 10px 20px;
+    font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .pp2-analyze-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(59,130,246,0.35); }
+  .pp2-analyze-btn:active { transform: translateY(0); }
+
+  .pp2-ratio-display { text-align: center; margin: 6px 0 18px; }
+  .pp2-ratio-display .pp2-ratio-num { font-size: 44px; font-weight: 800; color: var(--accent-orange); line-height: 1; font-variant-numeric: tabular-nums; }
+  .pp2-ratio-display .pp2-ratio-lbl { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 6px; }
+
+  .pp2-gauge-track { position: relative; height: 14px; border-radius: 7px; background: rgba(255,255,255,0.06); margin: 10px 0 8px; overflow: visible; }
+  .pp2-gauge-fill { height: 100%; border-radius: 7px; transition: width 0.8s cubic-bezier(.2,.9,.3,1), background 0.4s; width: 0%; }
+  .pp2-gauge-marker {
+    position: absolute; top: -7px; width: 3px; height: 28px; border-radius: 2px; background: var(--text);
+    left: 0%; transition: left 0.8s cubic-bezier(.2,.9,.3,1);
+  }
+  .pp2-gauge-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); }
+  .pp2-class-badge {
+    display: inline-block; font-size: 17px; font-weight: 800; padding: 7px 18px;
+    border-radius: 8px; margin: 10px 0; letter-spacing: 0.02em;
+  }
+  .pp2-class-badge.non-stiff { background: rgba(29,158,117,0.22); color: var(--stable-green); }
+  .pp2-class-badge.moderate { background: rgba(245,158,11,0.22); color: var(--accent-orange); }
+  .pp2-class-badge.stiff { background: rgba(216,90,48,0.22); color: var(--unstable-red); }
+
+  .pp2-method-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px; }
+  .pp2-method-col { border-radius: 10px; padding: 14px 16px; border: 1px solid var(--border); }
+  .pp2-method-col.recommend { background: var(--stable-bg); border-color: var(--stable-green); }
+  .pp2-method-col.avoid { background: var(--unstable-bg); border-color: var(--unstable-red); }
+  .pp2-method-col .pp2-col-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; margin: 0 0 10px; }
+  .pp2-method-col.recommend .pp2-col-title { color: var(--stable-green); }
+  .pp2-method-col.avoid .pp2-col-title { color: var(--unstable-red); }
+  .pp2-method-chip { display: flex; align-items: center; gap: 8px; font-size: 13.5px; padding: 6px 0; }
+  .pp2-method-chip .chip-icon { font-weight: 800; }
+  .pp2-method-col.recommend .chip-icon { color: var(--stable-green); }
+  .pp2-method-col.avoid .chip-icon { color: var(--unstable-red); }
+  .step-card.non-stiff-card { border-left-color: var(--stable-green); }
+  .step-card.moderate-card { border-left-color: var(--accent-orange); }
+  .step-card.stiff-card { border-left-color: var(--unstable-red); }
+
+  /* ── Stability Region Explorer: formula/geometry/badge annotations ── */
+  .region-info-row {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px;
+  }
+  .region-info-chip {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 14px; flex: 1 1 200px; min-width: 180px;
+  }
+  .region-info-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-muted); margin: 0 0 4px;
+  }
+  .region-info-value {
+    font-size: 15px; font-weight: 700; margin: 0; font-variant-numeric: tabular-nums;
+  }
+  .region-info-stable {
+    background: var(--stable-bg); border-color: var(--stable-green); color: var(--stable-green);
+  }
+
+  /* ── Pinned key-value tracker bar (PP1 & PP2) ── */
+  .kv-bar {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;
+    margin-bottom: 20px; position: sticky; top: 8px; z-index: 5;
+  }
+  .kv-bar.kv-bar-4 { grid-template-columns: repeat(4, 1fr); }
+  .kv-chip {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 12px; text-align: center; transition: background 0.35s, border-color 0.35s, transform 0.25s;
+  }
+  .kv-chip.pulse { animation: kvPulse 0.6s ease; }
+  @keyframes kvPulse { 0% { transform: scale(1); } 35% { transform: scale(1.06); } 100% { transform: scale(1); } }
+  .kv-chip .kv-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin: 0 0 4px; }
+  .kv-chip .kv-value { font-size: 17px; font-weight: 700; margin: 0; font-variant-numeric: tabular-nums; }
+  .kv-chip.kv-blue { border-color: var(--accent-blue); }
+  .kv-chip.kv-blue .kv-value { color: var(--accent-blue); }
+  .kv-chip.kv-stable { background: var(--stable-bg); border-color: var(--stable-green); }
+  .kv-chip.kv-stable .kv-value { color: var(--stable-green); }
+  .kv-chip.kv-unstable { background: var(--unstable-bg); border-color: var(--unstable-red); }
+  .kv-chip.kv-unstable .kv-value { color: var(--unstable-red); }
+  .kv-chip.kv-neutral { background: rgba(245,158,11,0.14); border-color: var(--accent-orange); }
+  .kv-chip.kv-neutral .kv-value { color: var(--accent-orange); }
+
+  /* ── Line-by-line formula reveal ── */
+  .formula-block { font-family: monospace; font-size: 20px; line-height: 1.9; }
+  .formula-line { opacity: 0; transform: translateX(-6px); transition: opacity 0.4s ease, transform 0.4s ease; display: flex; gap: 10px; align-items: baseline; }
+  .formula-line.show { opacity: 1; transform: translateX(0); }
+  .formula-line .fl-eq { color: var(--text-muted); font-size: 15px; min-width: 14px; }
+  .formula-line .fl-expr { color: var(--accent-blue); }
+  .formula-line.fl-final .fl-expr { color: var(--text); font-weight: 700; font-size: 22px; }
+
+  /* ── Result card (stability verdict) ── */
+  .result-card {
+    border-radius: 12px; padding: 18px 22px; border: 1px solid var(--border);
+    background: var(--panel-2); transition: background 0.3s, border-color 0.3s;
+  }
+  .result-card.ok { background: var(--stable-bg); border-color: var(--stable-green); }
+  .result-card.bad { background: var(--unstable-bg); border-color: var(--unstable-red); }
+  .result-card.neutralrc { background: rgba(245,158,11,0.14); border-color: var(--accent-orange); }
+  .result-card .rc-head { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 800; margin-bottom: 10px; }
+  .result-card.ok .rc-head { color: var(--stable-green); }
+  .result-card.bad .rc-head { color: var(--unstable-red); }
+  .result-card.neutralrc .rc-head { color: var(--accent-orange); }
+  .rc-condition { font-family: monospace; font-size: 15px; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 8px 12px; display: inline-block; margin-bottom: 10px; }
+  .rc-since { font-size: 13px; color: var(--text-muted); margin: 0 0 4px; }
+  .rc-since b { color: var(--text); font-family: monospace; }
+  .rc-explain { font-size: 14px; margin: 6px 0 0; line-height: 1.55; }
+
+  /* ── Why button + explanation panel ── */
+  .pp1-why-btn {
+    margin-top: 10px; background: transparent; border: 1px dashed var(--text-muted); color: var(--text-muted);
+    border-radius: 8px; padding: 6px 14px; font-size: 12.5px; cursor: pointer; font-weight: 600;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .pp1-why-btn:hover { border-color: var(--accent-blue); color: var(--text); }
+  .pp1-why-panel {
+    max-height: 0; opacity: 0; overflow: hidden; transition: max-height 0.4s ease, opacity 0.4s ease, margin 0.4s ease;
+    font-family: monospace; font-size: 13.5px; line-height: 1.9; background: rgba(255,255,255,0.04);
+    border-radius: 8px; border: 1px solid var(--border); padding: 0 14px;
+  }
+  .pp1-why-panel.show { max-height: 260px; opacity: 1; margin-top: 12px; padding: 12px 14px; }
+  .pp1-why-panel .why-label { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 8px; }
+  .pp1-why-panel .why-label:first-child { margin-top: 0; }
+  .pp1-why-panel .why-line { color: var(--text); }
+  .pp1-why-panel .why-final { font-weight: 700; }
+
+  /* ── Learning summary card (step 7) ── */
+  .pp1-summary-card {
+    border-radius: 12px; border: 1px solid var(--border); background: var(--panel-2);
+    padding: 18px 20px; margin-top: 4px;
+  }
+  .pp1-summary-card.ok { border-color: var(--stable-green); background: var(--stable-bg); }
+  .pp1-summary-card.bad { border-color: var(--unstable-red); background: var(--unstable-bg); }
+  .pp1-summary-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 14px; color: var(--text-muted); }
+  .pp1-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .pp1-summary-item { display: flex; gap: 8px; align-items: baseline; font-size: 14px; }
+  .pp1-summary-item .si-check { color: var(--stable-green); font-weight: 800; flex-shrink: 0; }
+  .pp1-summary-item .si-label { color: var(--text-muted); font-size: 12.5px; }
+  .pp1-summary-item .si-val { font-weight: 700; }
+
+  /* ── Merged step-8: graph + iteration table side by side ── */
+  .pp1-final-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px; }
+  @media (max-width: 820px) { .pp1-final-grid { grid-template-columns: 1fr; } }
+  .row-error-up { background: rgba(216,90,48,0.14) !important; }
+  .row-error-down { background: rgba(29,158,117,0.12) !important; }
+
+  /* ── PP2 redesigned gauge ── */
+  .pp2-gauge2 { margin: 10px 0 6px; }
+  .pp2-gauge2-track { position: relative; height: 34px; border-radius: 10px; overflow: visible;
+    background: linear-gradient(to right, rgba(29,158,117,0.28) 0%, rgba(29,158,117,0.28) 25%, rgba(245,158,11,0.28) 25%, rgba(245,158,11,0.28) 50%, rgba(226,113,29,0.28) 50%, rgba(226,113,29,0.28) 75%, rgba(216,90,48,0.28) 75%, rgba(216,90,48,0.28) 100%);
+    border: 1px solid var(--border);
+  }
+  .pp2-gauge2-needle {
+    position: absolute; top: -8px; width: 4px; height: 50px; border-radius: 2px;
+    background: var(--text); left: 0%; transition: left 0.9s cubic-bezier(.2,.9,.3,1);
+    box-shadow: 0 0 8px rgba(255,255,255,0.5);
+  }
+  .pp2-gauge2-needle::after {
+    content: ''; position: absolute; top: -6px; left: -4px; width: 12px; height: 12px;
+    border-radius: 50%; background: var(--text);
+  }
+  .pp2-gauge2-zones { display: flex; justify-content: space-between; gap: 4px; font-size: 10.5px; color: var(--text-muted); margin-top: 8px; font-weight: 600; flex-wrap: wrap; }
+  .pp2-gauge2-zones span.z-active { color: var(--text); }
+
+  /* ── PP2 Interpretation box ── */
+  .pp2-interpretation-box {
+    border-radius: 12px; padding: 14px 18px; border: 1px solid var(--accent-blue);
+    background: rgba(59,130,246,0.08); margin-top: 14px;
+  }
+  .pp2-interp-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-blue); font-weight: 700; margin: 0 0 8px; }
+  .pp2-interp-text { font-size: 14px; line-height: 1.65; margin: 0; color: var(--text); }
+  .pp2-interp-text b { color: var(--accent-blue); }
+
+  /* ── PP2 Eigenvalue complex-plane plot ── */
+  .pp2-eigen-wrap { position: relative; width: 100%; height: 170px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); margin-top: 14px; }
+  .pp2-final-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 820px) { .pp2-final-grid { grid-template-columns: 1fr; } }
+  .why-list { margin: 6px 0 0; padding-left: 20px; font-size: 14px; line-height: 1.7; }
+  .why-list li { margin-bottom: 4px; }
+  .takeaway-box {
+    border-radius: 12px; padding: 18px 22px; border: 1px solid var(--accent-blue);
+    background: rgba(59,130,246,0.1); margin-top: 4px;
+  }
+  .takeaway-box .tk-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-blue); font-weight: 700; margin: 0 0 12px; }
+  .tk-row { display: flex; gap: 10px; font-size: 14.5px; margin-bottom: 8px; align-items: baseline; }
+  .tk-row b { color: var(--text); }
+  .tk-check { color: var(--stable-green); font-weight: 800; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Stability &amp; Stiff Equations — Interactive Explorer</h1>
+  <p class="subtitle">Numerical Methods · CSE3107 — explore stability regions and watch numerical solutions behave in real time.</p>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="tab-region">Stability Region Explorer</button>
+    <button class="tab-btn" data-tab="tab-compare">Solution Comparison</button>
+    <button class="tab-btn" data-tab="tab-practice">Practice Problem 1</button>
+    <button class="tab-btn" data-tab="tab-practice2">Practice Problem 2</button>
+  </div>
+
+  <div id="tab-region" class="tab-panel active">
+    <div class="card">
+      <div class="controls-grid">
+        <div>
+          <label for="r-method">Method</label>
+          <select id="r-method">
+            <option value="fe">Forward Euler</option>
+            <option value="rk2">RK2 (Heun)</option>
+            <option value="rk4">RK4 (Classical)</option>
+            <option value="be">Backward Euler</option>
+            <option value="trap">Trapezoidal / Crank-Nicolson</option>
+          </select>
+        </div>
+        <div>
+          <label for="r-preset">Stiffness preset</label>
+          <select id="r-preset">
+            <option value="custom">Custom</option>
+            <option value="mild">Mild (λ = -10)</option>
+            <option value="stiff">Stiff (λ = -50)</option>
+            <option value="verystiff">Very stiff (λ = -1000)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="slider-row">
+        <label for="r-lambda">Re(λ)</label>
+        <input type="range" id="r-lambda" min="-1000" max="10" step="1" value="-50">
+        <span class="slider-out" id="r-lambda-out">-50</span>
+      </div>
+
+      <div class="slider-row">
+        <label for="r-lambda-im">Im(λ)</label>
+        <input type="range" id="r-lambda-im" min="-100" max="100" step="1" value="0">
+        <span class="slider-out" id="r-lambda-im-out">0</span>
+      </div>
+
+      <div class="slider-row">
+        <label for="r-hstep">h</label>
+        <input type="range" id="r-hstep" min="-4" max="0" step="0.02" value="-1">
+        <span class="slider-out" id="r-hstep-out">0.1</span>
+      </div>
+      <p style="font-size:12px; color:var(--text-muted); margin:-10px 0 16px;">λ = Re(λ) + Im(λ)·i is a complex eigenvalue — dragging Im(λ) moves z = hλ off the real axis, into the full complex plane where the stability region is actually defined.</p>
+
+      <div class="plot-wrap">
+        <canvas id="r-plane"></canvas>
+      </div>
+      <div class="legend">
+        <span class="legend-item" style="cursor:default;"><span class="swatch dot" style="background:rgba(29,158,117,0.5);"></span>Stable region (|R(z)| &lt; 1)</span>
+        <span class="legend-item" style="cursor:default;"><span class="swatch dot" style="background:#1d9e75; border-radius:50%;"></span>Current z (stable)</span>
+        <span class="legend-item" style="cursor:default;"><span class="swatch dot" style="background:#d85a30; border-radius:50%;"></span>Current z (unstable)</span>
+      </div>
+
+      <div class="region-info-row" id="r-info-row">
+        <div class="region-info-chip" id="r-info-formula">
+          <p class="region-info-label" id="r-info-formula-method">Forward Euler</p>
+          <p class="region-info-value" id="r-info-formula-val" style="font-size:15px;">R(z) = 1 + z</p>
+        </div>
+        <div class="region-info-chip" id="r-info-geometry">
+          <p class="region-info-label">Circle Geometry</p>
+          <p class="region-info-value" style="font-size:13px; font-weight:600;">Center = <span id="r-info-center">(−1, 0)</span>, Radius = <span id="r-info-radius">1</span></p>
+          <p class="region-info-value" style="font-size:12px; font-weight:500; color:var(--text-muted); margin-top:2px;">Condition: <span id="r-info-condition">|1+z| &lt; 1</span></p>
+        </div>
+        <div class="region-info-chip" id="r-info-realaxis" style="display:none;">
+          <p class="region-info-label">Real-axis limit</p>
+          <p class="region-info-value" id="r-info-realaxis-val">−2 &lt; z &lt; 0</p>
+        </div>
+        <div class="region-info-chip region-info-stable" id="r-info-badge" style="display:none;">
+          <p class="region-info-value" id="r-info-badge-label" style="font-size:16px;">A-Stable</p>
+          <p class="region-info-label" id="r-info-badge-sub" style="text-transform:none; letter-spacing:0; font-size:12px; margin-top:2px; color:inherit;">Entire Left Half-Plane</p>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card"><p class="stat-label">z = hλ</p><p class="stat-value" id="r-z-out" style="font-size:16px;">-5.00</p></div>
+        <div class="stat-card"><p class="stat-label">R(z)</p><p class="stat-value" id="r-rz-out" style="font-size:16px;">-4.00</p></div>
+        <div class="stat-card"><p class="stat-label">|R(z)|</p><p class="stat-value" id="r-absrz-out">4.00</p></div>
+        <div class="stat-card" id="r-status-card"><p class="stat-label" id="r-status-label">Status</p><p class="stat-value" id="r-status-out">Unstable</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-compare" class="tab-panel">
+    <div class="card">
+      <div class="preset-row">
+        <button class="preset-btn" data-lambda="-10" data-h="0.1">Non-stiff (λ=-10, h=0.1)</button>
+        <button class="preset-btn" data-lambda="-50" data-h="0.1">Classic stiff (λ=-50, h=0.1)</button>
+        <button class="preset-btn" data-lambda="-50" data-h="0.03">Stiff, small h (λ=-50, h=0.03)</button>
+        <button class="preset-btn" data-lambda="-500" data-h="0.01">Very stiff (λ=-500, h=0.01)</button>
+      </div>
+
+      <div class="slider-row">
+        <label for="c-lambda">λ (real)</label>
+        <input type="range" id="c-lambda" min="-500" max="-1" step="1" value="-50">
+        <span class="slider-out" id="c-lambda-out">-50</span>
+      </div>
+
+      <div class="slider-row">
+        <label for="c-hstep">h</label>
+        <input type="range" id="c-hstep" min="-4" max="-0.3" step="0.02" value="-1">
+        <span class="slider-out" id="c-hstep-out">0.1</span>
+      </div>
+
+      <div class="plot-wrap">
+        <canvas id="c-chart"></canvas>
+      </div>
+
+      <div class="legend" id="c-legend"></div>
+
+      <table>
+        <thead><tr><th>Method</th><th>R(z)</th><th>|R(z)|</th><th>Status</th></tr></thead>
+        <tbody id="c-table"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="tab-practice" class="tab-panel">
+    <div class="card">
+      <p style="font-size:14px; font-weight:600; margin:0 0 4px;">Practice Problem 1 — Interactive Stability Analysis</p>
+      <p style="font-size:12.5px; color:var(--text-muted); margin:0 0 16px;">Pick a method, set λ and h, then press Solve — the derivation unfolds one step at a time, like a teacher working it live on the board.</p>
+
+      <div class="pp1-input-grid">
+        <div class="pp1-field">
+          <label for="pp1-method">Method</label>
+          <select id="pp1-method">
+            <option value="fe">Forward Euler</option>
+            <option value="be">Backward Euler</option>
+            <option value="trap">Trapezoidal / Crank-Nicolson</option>
+          </select>
+        </div>
+        <div class="pp1-field">
+          <label for="pp1-lambda">λ (real)</label>
+          <input type="number" id="pp1-lambda" value="-50" step="1">
+        </div>
+        <div class="pp1-field">
+          <label for="pp1-h">h</label>
+          <input type="number" id="pp1-h" value="0.1" step="0.01" min="0.0001">
+        </div>
+        <div class="pp1-field">
+          <button class="pp1-solve-btn" id="pp1-solve-btn">▶ Solve</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="kv-bar" id="pp1-kv-bar">
+        <div class="kv-chip kv-blue" id="pp1-kv-z"><p class="kv-label">Current z</p><p class="kv-value" id="pp1-kv-z-val">–</p></div>
+        <div class="kv-chip kv-blue" id="pp1-kv-rz"><p class="kv-label">Current R(z)</p><p class="kv-value" id="pp1-kv-rz-val">–</p></div>
+        <div class="kv-chip kv-blue" id="pp1-kv-absrz"><p class="kv-label">|R(z)|</p><p class="kv-value" id="pp1-kv-absrz-val">–</p></div>
+        <div class="kv-chip" id="pp1-kv-method"><p class="kv-label">Method</p><p class="kv-value" id="pp1-kv-method-val" style="font-size:13px;">–</p></div>
+        <div class="kv-chip" id="pp1-kv-status"><p class="kv-label">Stability</p><p class="kv-value" id="pp1-kv-status-val">–</p></div>
+      </div>
+
+      <div class="pp1-steps" id="pp1-steps">
+
+        <div class="solve-step" id="pp1-step-1">
+          <div class="step-card">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <p class="step-title">Given values</p>
+              <p class="step-content"><span class="math" id="pp1-s1-text">λ = −50, h = 0.1</span></p>
+              <p class="step-content sub" id="pp1-s1-method">Method selected: Forward Euler</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="solve-step" id="pp1-step-2">
+          <div class="step-card">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <p class="step-title">Stability parameter z = hλ</p>
+              <p class="step-content"><span class="math" id="pp1-s2-text">z = 0.1 × (−50) = −5.00</span></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="solve-step" id="pp1-step-3">
+          <div class="step-card">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <p class="step-title">Amplification factor — substitute &amp; solve</p>
+              <div class="formula-block" id="pp1-formula-block">
+                <div class="formula-line" id="pp1-fl-0"><span class="fl-eq"></span><span class="fl-expr" id="pp1-fl-0-expr">R(z)</span></div>
+                <div class="formula-line" id="pp1-fl-1"><span class="fl-eq">=</span><span class="fl-expr" id="pp1-fl-1-expr">1 + z</span></div>
+                <div class="formula-line" id="pp1-fl-2"><span class="fl-eq">=</span><span class="fl-expr" id="pp1-fl-2-expr">1 + (−5.00)</span></div>
+                <div class="formula-line fl-final" id="pp1-fl-3"><span class="fl-eq">=</span><span class="fl-expr" id="pp1-fl-3-expr">−4.00</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="solve-step" id="pp1-step-4">
+          <div class="step-card">
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <p class="step-title">Compute |R(z)| and compare with stability condition</p>
+              <p class="step-content"><span class="math" id="pp1-s6-text">|R(z)| = 4.00</span></p>
+              <p class="step-content sub" style="margin-top:6px;">Stability condition: <b>|R(z)| &lt; 1 → stable</b></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="solve-step" id="pp1-step-5">
+          <div class="step-body" style="padding:0;">
+            <div class="result-card" id="pp1-result-card">
+              <div class="rc-head"><span id="pp1-rc-icon">✖</span><span id="pp1-rc-word">Unstable</span></div>
+              <div class="rc-condition" id="pp1-rc-condition">|R(z)| = 4.00</div>
+              <p class="rc-since">Since <b id="pp1-rc-since">|R(z)| &gt; 1</b></p>
+              <p class="rc-explain" id="pp1-rc-explain">Errors grow rapidly. The numerical solution diverges.</p>
+              <button class="pp1-why-btn" id="pp1-why-btn">❓ Why is it <span id="pp1-why-btn-word">unstable</span>?</button>
+              <div class="pp1-why-panel" id="pp1-why-panel">
+                <div class="why-label" id="pp1-why-title-label">Stability condition</div>
+                <div class="why-line" id="pp1-why-condition">|R(z)| &lt; 1</div>
+                <div class="why-label">Current value</div>
+                <div class="why-line" id="pp1-why-current">|R(z)| = 4.00</div>
+                <div class="why-label">Since</div>
+                <div class="why-line why-final" id="pp1-why-since">4.00 &gt; 1</div>
+                <div class="why-label">Conclusion</div>
+                <div class="why-line" id="pp1-why-conclusion">the solution becomes unstable.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="solve-step" id="pp1-step-6">
+          <div class="step-card" style="display:block;">
+            <div style="display:flex; gap:14px; align-items:flex-start; width:100%;">
+              <div class="step-num">6</div>
+              <div class="step-body" style="width:100%;">
+                <p class="step-title">Graph &amp; iteration table</p>
+                <div class="pp1-final-grid">
+                  <div>
+                    <div class="pp1-plot-wrap">
+                      <canvas id="pp1-chart"></canvas>
+                    </div>
+                    <div class="legend" style="margin-top:10px;">
+                      <span class="legend-item" style="cursor:default;"><span class="swatch dashed" style="background:#92a1bd; color:#92a1bd;"></span>Exact: y = e^(λt)</span>
+                      <span class="legend-item" style="cursor:default;"><span class="swatch" style="background:#3b82f6;"></span>Numerical solution</span>
+                    </div>
+                  </div>
+                  <div>
+                    <p class="step-content sub" style="margin:0 0 6px;">yₙ₊₁ = R(z) · yₙ, y₀ = 1</p>
+                    <div class="pp1-table-wrap">
+                      <table>
+                        <thead><tr><th>n</th><th>Exact</th><th>Numerical</th><th>Abs Error</th></tr></thead>
+                        <tbody id="pp1-iter-table"></tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="solve-step" id="pp1-step-7">
+          <div class="step-body" style="padding:0;">
+            <div class="pp1-summary-card" id="pp1-summary-card">
+              <p class="pp1-summary-title">📋 Learning summary</p>
+              <div class="pp1-summary-grid">
+                <div class="pp1-summary-item"><span class="si-check">✓</span><span><span class="si-label">Method</span><br><span class="si-val" id="pp1-sum-method">–</span></span></div>
+                <div class="pp1-summary-item"><span class="si-check">✓</span><span><span class="si-label">Stable?</span><br><span class="si-val" id="pp1-sum-stable">–</span></span></div>
+                <div class="pp1-summary-item"><span class="si-check">✓</span><span><span class="si-label">Error trend</span><br><span class="si-val" id="pp1-sum-error">–</span></span></div>
+                <div class="pp1-summary-item"><span class="si-check">✓</span><span><span class="si-label">Recommended</span><br><span class="si-val" id="pp1-sum-rec">–</span></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-practice2" class="tab-panel">
+    <div class="card">
+      <p style="font-size:14px; font-weight:600; margin:0 0 4px;">Practice Problem 2 — Interactive Stiffness Analysis</p>
+      <p style="font-size:12.5px; color:var(--text-muted); margin:0 0 16px;">Enter the fastest and slowest eigenvalues of the system, then press Analyze — the reasoning unfolds one step at a time.</p>
+
+      <div class="pp2-input-grid">
+        <div class="pp2-field">
+          <label for="pp2-lammax">λ_max (fastest mode, negative)</label>
+          <input type="number" id="pp2-lammax" value="-500" step="1">
+        </div>
+        <div class="pp2-field">
+          <label for="pp2-lammin">λ_min (slowest mode, negative)</label>
+          <input type="number" id="pp2-lammin" value="-1" step="0.1">
+        </div>
+        <div class="pp2-field">
+          <button class="pp2-analyze-btn" id="pp2-analyze-btn">▶ Analyze</button>
+        </div>
+      </div>
+
+      <div class="kv-bar kv-bar-4" id="pp2-kv-bar">
+        <div class="kv-chip kv-blue" id="pp2-kv-ratio"><p class="kv-label">Stiffness Ratio</p><p class="kv-value" id="pp2-kv-ratio-val">–</p></div>
+        <div class="kv-chip" id="pp2-kv-class"><p class="kv-label">Classification</p><p class="kv-value" id="pp2-kv-class-val" style="font-size:14px;">–</p></div>
+        <div class="kv-chip kv-stable" id="pp2-kv-rec"><p class="kv-label">Top Recommendation</p><p class="kv-value" id="pp2-kv-rec-val" style="font-size:13px;">–</p></div>
+        <div class="kv-chip kv-unstable" id="pp2-kv-avoid"><p class="kv-label">Avoid</p><p class="kv-value" id="pp2-kv-avoid-val" style="font-size:13px;">–</p></div>
+      </div>
+
+      <div class="pp1-steps" id="pp2-steps">
+
+        <div class="solve-step" id="pp2-step-1">
+          <div class="step-card">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <p class="step-title">Given eigenvalues</p>
+              <p class="step-content"><span class="math" id="pp2-s1-text">λ_max = −500,  λ_min = −1</span></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="solve-step" id="pp2-step-2">
+          <div class="step-card">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <p class="step-title">Compute stiffness ratio</p>
+              <div class="formula-block" id="pp2-formula-block" style="font-size:18px;">
+                <div class="formula-line" id="pp2-fl-0"><span class="fl-eq"></span><span class="fl-expr">S</span></div>
+                <div class="formula-line" id="pp2-fl-1"><span class="fl-eq">=</span><span class="fl-expr">|λ_max| / |λ_min|</span></div>
+                <div class="formula-line" id="pp2-fl-2"><span class="fl-eq">=</span><span class="fl-expr" id="pp2-fl-2-expr">|−500| / |−1|</span></div>
+                <div class="formula-line fl-final" id="pp2-fl-3"><span class="fl-eq">=</span><span class="fl-expr" id="pp2-fl-3-expr">500</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="solve-step" id="pp2-step-3">
+          <div class="step-card" id="pp2-s4-card">
+            <div class="step-num" id="pp2-s4-num">3</div>
+            <div class="step-body">
+              <p class="step-title">Classify</p>
+              <span class="pp2-class-badge" id="pp2-class-badge">STIFF</span>
+              <div class="pp2-gauge2">
+                <div class="pp2-gauge2-track">
+                  <div class="pp2-gauge2-needle" id="pp2-gauge-marker"></div>
+                </div>
+                <div class="pp2-gauge2-zones">
+                  <span id="pp2-zone-1">🟢 S&lt;10</span>
+                  <span id="pp2-zone-2">🟡 10–100</span>
+                  <span id="pp2-zone-3">🟠 100–1000</span>
+                  <span id="pp2-zone-4">🔴 S&gt;1000</span>
+                </div>
+              </div>
+              <p class="step-content sub" id="pp2-s5-text" style="margin-top:10px;">The fastest mode decays 500× faster than the slowest mode.</p>
+
+              <div class="pp2-interpretation-box" id="pp2-interpretation">
+                <p class="pp2-interp-title">💡 Interpretation</p>
+                <p class="pp2-interp-text" id="pp2-interp-text">—</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="solve-step" id="pp2-step-4">
+          <div class="step-card" style="display:block;">
+            <div style="display:flex; gap:14px; align-items:flex-start; width:100%;">
+              <div class="step-num">4</div>
+              <div class="step-body" style="width:100%;">
+                <p class="step-title">Why it matters: steps needed for a stable, accurate run</p>
+                <div class="pp2-plot-wrap">
+                  <canvas id="pp2-chart"></canvas>
+                </div>
+                <div class="legend" style="margin-top:10px;">
+                  <span class="legend-item" style="cursor:default;"><span class="swatch" style="background:#d85a30;"></span>Explicit (Forward Euler) — stability-limited</span>
+                  <span class="legend-item" style="cursor:default;"><span class="swatch" style="background:#3b82f6;"></span>Implicit (Backward Euler) — accuracy-limited</span>
+                </div>
+                <p class="step-content sub" id="pp2-graph-note" style="margin-top:10px;">An explicit method must keep h ≤ 2/|λ_max| for stability the entire run, even though the slow mode needs the simulation to keep going for ~5/|λ_min| — that mismatch is where the huge step count comes from. An implicit method skips it entirely by choosing h from accuracy alone.</p>
+
+                <p class="step-title" style="margin-top:18px;">Eigenvalues on the complex plane</p>
+                <div class="pp2-eigen-wrap">
+                  <canvas id="pp2-eigen-chart"></canvas>
+                </div>
+                <div class="legend" style="margin-top:10px;">
+                  <span class="legend-item" style="cursor:default;"><span class="swatch" style="background:#d85a30;"></span>λ_max (fast)</span>
+                  <span class="legend-item" style="cursor:default;"><span class="swatch" style="background:#3b82f6;"></span>λ_min (slow)</span>
+                </div>
+                <p class="step-content sub" id="pp2-eigen-note" style="margin-top:10px;">Both eigenvalues sit on the real axis (no oscillation). λ_max sits far to the left of λ_min — that distance on the plane is the stiffness.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="solve-step" id="pp2-step-5">
+          <div class="step-body" style="padding:0;">
+            <div class="pp2-final-grid">
+              <div class="pp2-method-col recommend">
+                <p class="pp2-col-title">✓ Recommended Methods</p>
+                <div id="pp2-recommend-list"></div>
+              </div>
+              <div class="pp2-method-col avoid">
+                <p class="pp2-col-title">✗ Avoid</p>
+                <div id="pp2-avoid-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="solve-step" id="pp2-step-6">
+          <div class="step-card">
+            <div class="step-num">6</div>
+            <div class="step-body">
+              <p class="step-title">Why?</p>
+              <ul class="why-list" id="pp2-why-list">
+                <li>The stiffness ratio is very large.</li>
+                <li>Explicit methods require extremely small step sizes.</li>
+                <li>Implicit methods remain stable for large step sizes.</li>
+              </ul>
+              <div class="takeaway-box" style="margin-top:16px;">
+                <p class="tk-title">Key Takeaway</p>
+                <div class="tk-row"><span class="tk-check">✔</span> Problem Classification: <b id="pp2-tk-class">Highly Stiff</b></div>
+                <div class="tk-row"><span class="tk-check">✔</span> Recommended Method: <b id="pp2-tk-method">Backward Euler</b></div>
+                <div class="tk-row"><span class="tk-check">✔</span> Reason: <b id="pp2-tk-reason">Stable for large step sizes.</b></div>
+              </div>
+              <p class="step-content sub" style="margin-top:12px; padding:10px 12px; background:rgba(255,255,255,0.04); border-radius:8px; border:1px solid var(--border);">
+                ⚠️ <b style="color:var(--text);">Simplification:</b> this recommendation is based only on the stiffness ratio thresholds shown above. Real solver selection also depends on accuracy requirements, error tolerance, the system's Jacobian, and nonlinear behavior — this tool isolates the stiffness-ratio effect for teaching purposes.
+              </p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <details class="limits-box">
+    <summary>Notes &amp; limitations of this tool ▾</summary>
+    <ul class="limits-list">
+      <li><b>Linear stability only.</b> The Stability Region Explorer, Solution Comparison, and both practice problems analyze the linear test equation dy/dt = λy. Real nonlinear systems have state- and time-varying local eigenvalues, so this is a deliberate simplification for teaching the core idea.</li>
+      <li><b>Practice Problem 2's recommendation is a heuristic.</b> It classifies purely on the stiffness ratio S = |λ_max|/|λ_min| against the S&lt;10 / 10–1000 / &gt;1000 thresholds. Real solver selection also weighs accuracy requirements, error tolerance, the system's Jacobian, and nonlinear behavior.</li>
+      <li><b>No adaptive step size.</b> Every h on this page is fixed for the whole run. Production solvers (e.g. ode45, LSODA) adjust h automatically from a local error estimate — that adaptive logic isn't modeled here.</li>
+      <li><b>Implicit solves are shown as a formula, not a solver.</b> Backward Euler and Trapezoidal are evaluated via their closed-form amplification factor R(z). In practice, each implicit step on a nonlinear system needs an iterative solve (typically Newton's method) that isn't visualized.</li>
+      <li><b>Complex eigenvalues are partially supported.</b> The Stability Region Explorer lets Im(λ) move the point z=hλ off the real axis.</li>
+    </ul>
+  </details>
+
+  <footer>Numerical Methods · CSE3107 — Stability Region &amp; Stiff Equations</footer>
+</div>
+
+<script>
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+    requestAnimationFrame(() => {
+      if (btn.dataset.tab === 'tab-region') { regionResize(); regionDraw(); }
+      else if (btn.dataset.tab === 'tab-compare') { compareResize(); compareDraw(); }
+      else if (btn.dataset.tab === 'tab-practice') { pp1ResizeAndRedraw(); }
+      else if (btn.dataset.tab === 'tab-practice2') { pp2ResizeAndRedraw(); }
+    });
+  });
+});
+
+function complexR(method, zr, zi) {
+  function cadd(a,b){return [a[0]+b[0], a[1]+b[1]];}
+  function csub(a,b){return [a[0]-b[0], a[1]-b[1]];}
+  function cmul(a,b){return [a[0]*b[0]-a[1]*b[1], a[0]*b[1]+a[1]*b[0]];}
+  function cdiv(a,b){const d=b[0]*b[0]+b[1]*b[1]; return [(a[0]*b[0]+a[1]*b[1])/d, (a[1]*b[0]-a[0]*b[1])/d];}
+  const z = [zr, zi];
+  const one = [1,0];
+  if (method === 'fe') return cadd(one, z);
+  if (method === 'rk2') { const z2 = cmul(z,z); return cadd(cadd(one,z), [z2[0]/2, z2[1]/2]); }
+  if (method === 'rk4') {
+    const z2 = cmul(z,z), z3 = cmul(z2,z), z4 = cmul(z3,z);
+    return cadd(cadd(cadd(cadd(one,z),[z2[0]/2,z2[1]/2]),[z3[0]/6,z3[1]/6]),[z4[0]/24,z4[1]/24]);
+  }
+  if (method === 'be') return cdiv(one, csub(one, z));
+  if (method === 'trap') return cdiv(cadd(one,[z[0]/2,z[1]/2]), csub(one,[z[0]/2,z[1]/2]));
+}
+function fmt(n, d) {
+  if (!isFinite(n)) return '∞';
+  const f = Math.pow(10, d===undefined?2:d);
+  return Math.round(n*f)/f;
+}
+function fmtSmart(n) {
+  if (!isFinite(n)) return '∞';
+  const a = Math.abs(n);
+  if (a !== 0 && (a < 0.001 || a > 100000)) return n.toExponential(2);
+  return fmt(n, 3);
+}
+function hFromSlider(v) { return Math.pow(10, v); }
+function fmtComplex(re, im) {
+  const reS = fmtSmart(re);
+  if (Math.abs(im) < 1e-9) return reS;
+  return reS + (im >= 0 ? ' + ' : ' − ') + fmtSmart(Math.abs(im)) + 'i';
+}
+function ccAdd(a,b){ return [a[0]+b[0], a[1]+b[1]]; }
+function ccSub(a,b){ return [a[0]-b[0], a[1]-b[1]]; }
+function ccMul(a,b){ return [a[0]*b[0]-a[1]*b[1], a[0]*b[1]+a[1]*b[0]]; }
+function ccDiv(a,b){ const d=b[0]*b[0]+b[1]*b[1]; return [(a[0]*b[0]+a[1]*b[1])/d, (a[1]*b[0]-a[0]*b[1])/d]; }
+function ccScale(a,s){ return [a[0]*s, a[1]*s]; }
+function ccAbs(a){ return Math.sqrt(a[0]*a[0]+a[1]*a[1]); }
+
+const rMethodSel = document.getElementById('r-method');
+const rPresetSel = document.getElementById('r-preset');
+const rLamSlider = document.getElementById('r-lambda');
+const rLamImSlider = document.getElementById('r-lambda-im');
+const rLamImOut = document.getElementById('r-lambda-im-out');
+const rHSlider = document.getElementById('r-hstep');
+const rLamOut = document.getElementById('r-lambda-out');
+const rHOut = document.getElementById('r-hstep-out');
+const rZOut = document.getElementById('r-z-out');
+const rRzOut = document.getElementById('r-rz-out');
+const rAbsOut = document.getElementById('r-absrz-out');
+const rStatusOut = document.getElementById('r-status-out');
+const rStatusLabel = document.getElementById('r-status-label');
+const rStatusCard = document.getElementById('r-status-card');
+const rCanvas = document.getElementById('r-plane');
+const rCtx = rCanvas.getContext('2d');
+const R_XMIN=-6, R_XMAX=3, R_YMIN=-4, R_YMAX=4;
+
+function regionResize() {
+  const rect = rCanvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  rCanvas.width = rect.width * dpr;
+  rCanvas.height = rect.height * dpr;
+}
+function regionToPx(x, y, w, h) { return [ (x-R_XMIN)/(R_XMAX-R_XMIN)*w, h - (y-R_YMIN)/(R_YMAX-R_YMIN)*h ]; }
+function regionDraw() {
+  const w = rCanvas.width, h = rCanvas.height;
+  const dpr = window.devicePixelRatio || 1;
+  const method = rMethodSel.value;
+  const stableFill = 'rgba(29,158,117,0.35)';
+  const gridColor = 'rgba(255,255,255,0.06)';
+  const axisColor = 'rgba(255,255,255,0.35)';
+  const bgColor = '#0d1626';
+  rCtx.fillStyle = bgColor;
+  rCtx.fillRect(0,0,w,h);
+  const cols = 160, rows = Math.round(160 * (h/w));
+  const cw = w/cols, ch = h/rows;
+  for (let i=0;i<cols;i++){
+    for (let j=0;j<rows;j++){
+      const x = R_XMIN + (i+0.5)/cols*(R_XMAX-R_XMIN);
+      const y = R_YMIN + (j+0.5)/rows*(R_YMAX-R_YMIN);
+      let Rval;
+      try { Rval = complexR(method, x, y); } catch(e) { Rval = null; }
+      if (Rval && (Rval[0]*Rval[0]+Rval[1]*Rval[1]) < 1) {
+        rCtx.fillStyle = stableFill;
+        rCtx.fillRect(i*cw, j*ch, cw+1, ch+1);
+      }
+    }
+  }
+  rCtx.strokeStyle = gridColor;
+  rCtx.lineWidth = 1*dpr;
+  for (let gx = Math.ceil(R_XMIN); gx<=R_XMAX; gx++){
+    const [px] = regionToPx(gx,0,w,h);
+    rCtx.beginPath(); rCtx.moveTo(px,0); rCtx.lineTo(px,h); rCtx.stroke();
+  }
+  for (let gy = Math.ceil(R_YMIN); gy<=R_YMAX; gy++){
+    const [,py] = regionToPx(0,gy,w,h);
+    rCtx.beginPath(); rCtx.moveTo(0,py); rCtx.lineTo(w,py); rCtx.stroke();
+  }
+  rCtx.strokeStyle = axisColor;
+  rCtx.lineWidth = 1.5*dpr;
+  const [ax0] = regionToPx(0,0,w,h);
+  rCtx.beginPath(); rCtx.moveTo(ax0,0); rCtx.lineTo(ax0,h); rCtx.stroke();
+  const [,ay0] = regionToPx(0,0,w,h);
+  rCtx.beginPath(); rCtx.moveTo(0,ay0); rCtx.lineTo(w,ay0); rCtx.stroke();
+  rCtx.fillStyle = '#92a1bd';
+  rCtx.font = (11*dpr)+'px sans-serif';
+  rCtx.fillText('Re(z)', w-42*dpr, ay0-6*dpr);
+  rCtx.fillText('Im(z)', ax0+6*dpr, 14*dpr);
+  const lamRe = parseFloat(rLamSlider.value);
+  const lamIm = parseFloat(rLamImSlider.value);
+  const h_ = hFromSlider(parseFloat(rHSlider.value));
+  const zr = lamRe*h_, zi = lamIm*h_;
+  const [px,py] = regionToPx(zr,zi,w,h);
+  const Rval = complexR(method, zr, zi);
+  const stable = (Rval[0]*Rval[0]+Rval[1]*Rval[1]) < 1;
+  rCtx.beginPath();
+  rCtx.arc(px, py, 6*dpr, 0, 2*Math.PI);
+  rCtx.fillStyle = stable ? '#1d9e75' : '#d85a30';
+  rCtx.fill();
+  rCtx.strokeStyle = bgColor;
+  rCtx.lineWidth = 2*dpr;
+  rCtx.stroke();
+}
+const regionMethodInfo = {
+  fe:   { name: 'Forward Euler',  formula: 'R(z) = 1 + z',
+          geometry: { center: '(−1, 0)', radius: '1', condition: '|1+z| < 1' },
+          realAxis: null, badge: null },
+  rk2:  { name: 'RK2 (Heun)',     formula: 'R(z) = 1 + z + z²/2',
+          geometry: null, realAxis: '−2.0 < z < 0', badge: null },
+  rk4:  { name: 'RK4 (Classical)',formula: 'R(z) = 1+z+z²/2!+z³/3!+z⁴/4!',
+          geometry: null, realAxis: '≈ −2.785 < z < 0', badge: null },
+  be:   { name: 'Backward Euler', formula: 'R(z) = 1 / (1 − z)',
+          geometry: null, realAxis: null, badge: { label: 'A-Stable', sub: 'Entire Left Half-Plane' } },
+  trap: { name: 'Trapezoidal',    formula: 'R(z) = (1+z/2) / (1−z/2)',
+          geometry: null, realAxis: null, badge: { label: 'A-Stable', sub: 'Not L-Stable' } }
+};
+function updateRegionInfoPanel(method) {
+  const info = regionMethodInfo[method];
+  document.getElementById('r-info-formula-method').textContent = info.name;
+  document.getElementById('r-info-formula-val').textContent = info.formula;
+
+  const geoEl = document.getElementById('r-info-geometry');
+  const axisEl = document.getElementById('r-info-realaxis');
+  const badgeEl = document.getElementById('r-info-badge');
+  geoEl.style.display = 'none';
+  axisEl.style.display = 'none';
+  badgeEl.style.display = 'none';
+
+  if (info.geometry) {
+    document.getElementById('r-info-center').textContent = info.geometry.center;
+    document.getElementById('r-info-radius').textContent = info.geometry.radius;
+    document.getElementById('r-info-condition').textContent = info.geometry.condition;
+    geoEl.style.display = 'block';
+  }
+  if (info.realAxis) {
+    document.getElementById('r-info-realaxis-val').textContent = info.realAxis;
+    axisEl.style.display = 'block';
+  }
+  if (info.badge) {
+    document.getElementById('r-info-badge-label').textContent = info.badge.label;
+    document.getElementById('r-info-badge-sub').textContent = info.badge.sub;
+    badgeEl.style.display = 'block';
+  }
+}
+function regionUpdate() {
+  const lamRe = parseFloat(rLamSlider.value);
+  const lamIm = parseFloat(rLamImSlider.value);
+  const h_ = hFromSlider(parseFloat(rHSlider.value));
+  const zr = lamRe*h_, zi = lamIm*h_;
+  const method = rMethodSel.value;
+  const Rval = complexR(method, zr, zi);
+  const absR = Math.sqrt(Rval[0]*Rval[0]+Rval[1]*Rval[1]);
+  const stable = absR < 1;
+  rLamOut.textContent = fmt(lamRe,0);
+  rLamImOut.textContent = fmt(lamIm,0);
+  rHOut.textContent = h_ < 0.001 ? h_.toExponential(1) : fmt(h_,3);
+  rZOut.textContent = fmtComplex(zr, zi);
+  rRzOut.textContent = fmtComplex(Rval[0], Rval[1]);
+  rAbsOut.textContent = fmt(absR);
+  rStatusLabel.textContent = 'Status';
+  rStatusOut.textContent = stable ? 'Stable' : 'Unstable';
+  rStatusCard.className = 'stat-card ' + (stable ? 'status-stable' : 'status-unstable');
+  updateRegionInfoPanel(method);
+  regionResize();
+  regionDraw();
+}
+rMethodSel.addEventListener('change', regionUpdate);
+rLamSlider.addEventListener('input', () => { rPresetSel.value='custom'; regionUpdate(); });
+rLamImSlider.addEventListener('input', () => { rPresetSel.value='custom'; regionUpdate(); });
+rHSlider.addEventListener('input', regionUpdate);
+rPresetSel.addEventListener('change', () => {
+  const v = rPresetSel.value;
+  if (v==='mild') rLamSlider.value = -10;
+  if (v==='stiff') rLamSlider.value = -50;
+  if (v==='verystiff') rLamSlider.value = -1000;
+  rLamImSlider.value = 0;
+  regionUpdate();
+});
+
+const cMethods = {
+  exact: { name: 'Exact', hex: '#92a1bd', dashed: true },
+  fe:    { name: 'Forward Euler', hex: '#d85a30', R: z => 1 + z },
+  rk2:   { name: 'RK2 (Heun)', hex: '#f59e0b', R: z => 1 + z + z*z/2 },
+  rk4:   { name: 'RK4 (Classical)', hex: '#1d9e75', R: z => 1 + z + z*z/2 + z*z*z/6 + z*z*z*z/24 },
+  be:    { name: 'Backward Euler', hex: '#3b82f6', R: z => 1 / (1 - z) },
+  trap:  { name: 'Trapezoidal', hex: '#d4537e', R: z => (1 + z/2) / (1 - z/2) }
+};
+const cVisible = { exact: true, fe: true, rk2: true, rk4: true, be: true, trap: true };
+const cLamSlider = document.getElementById('c-lambda');
+const cHSlider = document.getElementById('c-hstep');
+const cLamOut = document.getElementById('c-lambda-out');
+const cHOut = document.getElementById('c-hstep-out');
+const cCanvas = document.getElementById('c-chart');
+const cCtx = cCanvas.getContext('2d');
+const cLegendEl = document.getElementById('c-legend');
+const cTableEl = document.getElementById('c-table');
+
+function compareBuildLegend() {
+  cLegendEl.innerHTML = '';
+  Object.keys(cMethods).forEach(key => {
+    const m = cMethods[key];
+    const item = document.createElement('div');
+    item.className = 'legend-item' + (cVisible[key] ? '' : ' off');
+    item.innerHTML = '<span class="swatch' + (m.dashed ? ' dashed' : '') + '" style="background:' + m.hex + '; color:' + m.hex + ';"></span>' + m.name;
+    item.addEventListener('click', () => { cVisible[key] = !cVisible[key]; compareBuildLegend(); compareDraw(); });
+    cLegendEl.appendChild(item);
+  });
+}
+function compareBuildTable(lam, h) {
+  const z = lam*h;
+  cTableEl.innerHTML = '';
+  ['fe','rk2','rk4','be','trap'].forEach(key => {
+    const m = cMethods[key];
+    const R = m.R(z);
+    const absR = Math.abs(R);
+    const stable = absR < 1;
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td><span class="swatch" style="background:'+m.hex+'; margin-right:8px;"></span>' + m.name + '</td>' +
+      '<td>' + fmtSmart(R) + '</td>' + '<td>' + fmtSmart(absR) + '</td>' +
+      '<td><span class="tag ' + (stable ? 'tag-stable' : 'tag-unstable') + '">' + (stable ? 'Stable' : 'Unstable') + '</span></td>';
+    cTableEl.appendChild(tr);
+  });
+}
+function compareResize() {
+  const rect = cCanvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  cCanvas.width = rect.width * dpr;
+  cCanvas.height = rect.height * dpr;
+}
+function compareSeries(lam, h) {
+  const z = lam*h;
+  const absLam = Math.abs(lam);
+  let tTarget = 4/absLam;
+  if (tTarget < 0.15) tTarget = 0.15;
+  if (tTarget > 4) tTarget = 4;
+  let N = Math.ceil(tTarget/h);
+  if (N < 6) N = 6;
+  if (N > 250) N = 250;
+  const exactPts = [];
+  const exactSteps = 200;
+  const tMax = N*h;
+  for (let i=0;i<=exactSteps;i++){
+    const t = tMax*i/exactSteps;
+    exactPts.push([t, Math.exp(lam*t)]);
+  }
+  let exactMaxAbs = 1;
+  exactPts.forEach(p => { if (Math.abs(p[1]) > exactMaxAbs) exactMaxAbs = Math.abs(p[1]); });
+  const yCap = Math.max(3*exactMaxAbs, 2);
+  const series = { exact: exactPts };
+  ['fe','rk2','rk4','be','trap'].forEach(key => {
+    const R = cMethods[key].R(z);
+    const pts = [];
+    let y = 1;
+    pts.push([0, y]);
+    let diverged = false;
+    for (let n=1; n<=N; n++){
+      y = y*R;
+      const t = n*h;
+      if (Math.abs(y) > yCap*1.4) { diverged = true; break; }
+      pts.push([t, y]);
+    }
+    series[key] = { pts, diverged };
+  });
+  return { series, yCap, tMax };
+}
+function compareDraw() {
+  const lam = parseFloat(cLamSlider.value);
+  const h = hFromSlider(parseFloat(cHSlider.value));
+  const { series, yCap, tMax } = compareSeries(lam, h);
+  const w = cCanvas.width, hgt = cCanvas.height;
+  const dpr = window.devicePixelRatio || 1;
+  const bgColor = '#0d1626';
+  const gridColor = 'rgba(255,255,255,0.06)';
+  const axisColor = 'rgba(255,255,255,0.35)';
+  const padL = 46*dpr, padR = 14*dpr, padT = 14*dpr, padB = 30*dpr;
+  const plotW = w - padL - padR, plotH = hgt - padT - padB;
+  cCtx.fillStyle = bgColor;
+  cCtx.fillRect(0,0,w,hgt);
+  const yMin = -yCap, yMax = yCap;
+  function toPx(t, y) {
+    const px = padL + (t/tMax)*plotW;
+    const py = padT + (1 - (y-yMin)/(yMax-yMin))*plotH;
+    return [px, py];
+  }
+  cCtx.strokeStyle = gridColor;
+  cCtx.lineWidth = 1*dpr;
+  cCtx.font = (10*dpr)+'px sans-serif';
+  cCtx.fillStyle = '#92a1bd';
+  for (let i=0;i<=4;i++){
+    const yVal = yMin + (yMax-yMin)*i/4;
+    const [,py] = toPx(0, yVal);
+    cCtx.beginPath(); cCtx.moveTo(padL, py); cCtx.lineTo(w-padR, py); cCtx.stroke();
+    cCtx.fillText(fmt(yVal,1), 4*dpr, py+3*dpr);
+  }
+  const tTicks = 5;
+  for (let i=0;i<=tTicks;i++){
+    const tVal = tMax*i/tTicks;
+    const [px] = toPx(tVal, 0);
+    cCtx.beginPath(); cCtx.moveTo(px, padT); cCtx.lineTo(px, hgt-padB); cCtx.stroke();
+    cCtx.fillText(fmt(tVal,2), px-10*dpr, hgt-padB+16*dpr);
+  }
+  cCtx.fillText('t', w-16*dpr, hgt-6*dpr);
+  cCtx.strokeStyle = axisColor;
+  cCtx.lineWidth = 1.5*dpr;
+  const [,zeroY] = toPx(0,0);
+  cCtx.beginPath(); cCtx.moveTo(padL, zeroY); cCtx.lineTo(w-padR, zeroY); cCtx.stroke();
+  cCtx.beginPath(); cCtx.moveTo(padL, padT); cCtx.lineTo(padL, hgt-padB); cCtx.stroke();
+  if (cVisible.exact) {
+    cCtx.strokeStyle = cMethods.exact.hex;
+    cCtx.lineWidth = 2*dpr;
+    cCtx.setLineDash([6*dpr, 4*dpr]);
+    cCtx.beginPath();
+    series.exact.forEach((p,i) => {
+      const [px,py] = toPx(p[0], Math.max(yMin, Math.min(yMax, p[1])));
+      if (i===0) cCtx.moveTo(px,py); else cCtx.lineTo(px,py);
+    });
+    cCtx.stroke();
+    cCtx.setLineDash([]);
+  }
+  ['fe','rk2','rk4','be','trap'].forEach(key => {
+    if (!cVisible[key]) return;
+    const m = cMethods[key];
+    const s = series[key];
+    cCtx.strokeStyle = m.hex;
+    cCtx.lineWidth = 2*dpr;
+    cCtx.beginPath();
+    s.pts.forEach((p,i) => {
+      const [px,py] = toPx(p[0], Math.max(yMin, Math.min(yMax, p[1])));
+      if (i===0) cCtx.moveTo(px,py); else cCtx.lineTo(px,py);
+    });
+    cCtx.stroke();
+    s.pts.forEach(p => {
+      const clampedY = Math.max(yMin, Math.min(yMax, p[1]));
+      const [px,py] = toPx(p[0], clampedY);
+      cCtx.beginPath();
+      cCtx.arc(px, py, 2.5*dpr, 0, 2*Math.PI);
+      cCtx.fillStyle = m.hex;
+      cCtx.fill();
+    });
+    if (s.diverged) {
+      const last = s.pts[s.pts.length-1];
+      const [px,py] = toPx(last[0], Math.max(yMin, Math.min(yMax, last[1])));
+      cCtx.fillStyle = m.hex;
+      cCtx.font = 'bold ' + (11*dpr) + 'px sans-serif';
+      cCtx.fillText('diverges ↗', px+4*dpr, py - 4*dpr*Math.sign(last[1]||1));
+    }
+  });
+}
+function compareUpdate() {
+  const lam = parseFloat(cLamSlider.value);
+  const h = hFromSlider(parseFloat(cHSlider.value));
+  cLamOut.textContent = fmt(lam,0);
+  cHOut.textContent = h < 0.001 ? h.toExponential(1) : fmt(h,3);
+  compareBuildTable(lam, h);
+  compareResize();
+  compareDraw();
+}
+cLamSlider.addEventListener('input', compareUpdate);
+cHSlider.addEventListener('input', compareUpdate);
+document.querySelectorAll('#tab-compare .preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    cLamSlider.value = btn.dataset.lambda;
+    cHSlider.value = Math.log10(parseFloat(btn.dataset.h));
+    compareUpdate();
+  });
+});
+
+
+window.addEventListener('resize', () => {
+  if (document.getElementById('tab-region').classList.contains('active')) { regionResize(); regionDraw(); }
+  else if (document.getElementById('tab-compare').classList.contains('active')) { compareResize(); compareDraw(); }
+  else if (document.getElementById('tab-practice').classList.contains('active')) { pp1ResizeAndRedraw(); }
+  else if (document.getElementById('tab-practice2').classList.contains('active')) { pp2ResizeAndRedraw(); }
+});
+
+/* ── Practice Problem 1 — interactive step-by-step solver ── */
+const pp1Formulas = {
+  fe:   { name: 'Forward Euler',              formula: 'R(z) = 1 + z',                          cond: '|1 + z| < 1',            condName: '|1 + hλ|' },
+  be:   { name: 'Backward Euler',              formula: 'R(z) = 1 / (1 − z)',                     cond: '|1 / (1 − z)| < 1',       condName: '|R(z)|' },
+  trap: { name: 'Trapezoidal / Crank-Nicolson', formula: 'R(z) = (1 + z/2) / (1 − z/2)',           cond: '|(1+z/2)/(1−z/2)| < 1',   condName: '|R(z)|' }
+};
+
+function pp1Substituted(method, z) {
+  const zs = fmtSmart(z);
+  const zsParen = z < 0 ? '(' + zs + ')' : zs;
+  if (method === 'fe')   return 'R(z) = 1 + ' + zsParen;
+  if (method === 'be')   return 'R(z) = 1 / (1 − ' + zsParen + ')';
+  if (method === 'trap') return 'R(z) = (1 + ' + zsParen + '/2) / (1 − ' + zsParen + '/2)';
+}
+
+const pp1MethodSel = document.getElementById('pp1-method');
+const pp1LambdaInput = document.getElementById('pp1-lambda');
+const pp1HInput = document.getElementById('pp1-h');
+const pp1SolveBtn = document.getElementById('pp1-solve-btn');
+const pp1Canvas = document.getElementById('pp1-chart');
+const pp1Ctx = pp1Canvas.getContext('2d');
+let pp1LastResult = null;
+let pp1Timers = [];
+
+[pp1MethodSel, pp1LambdaInput, pp1HInput].forEach(el => {
+  el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', pp1LiveRefreshChart);
+});
+
+/* ── Why button ── */
+const pp1WhyBtn = document.getElementById('pp1-why-btn');
+const pp1WhyPanel = document.getElementById('pp1-why-panel');
+pp1WhyBtn.addEventListener('click', () => {
+  pp1WhyPanel.classList.toggle('show');
+  const isOpen = pp1WhyPanel.classList.contains('show');
+  const word = pp1WhyBtn.dataset.status || 'unstable';
+  pp1WhyBtn.innerHTML = isOpen ? '❌ Hide explanation' : '❓ Why is it <span id="pp1-why-btn-word">' + word + '</span>?';
+});
+
+function pp1ResizeCanvas() {
+  const rect = pp1Canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  pp1Canvas.width = rect.width * dpr;
+  pp1Canvas.height = rect.height * dpr;
+}
+
+function pp1Draw(upToN) {
+  if (!pp1LastResult) return;
+  const { lam, h, N, ys } = pp1LastResult;
+  const shownN = (upToN === undefined || upToN === null) ? N : Math.max(0, Math.min(N, upToN));
+  const w = pp1Canvas.width, hgt = pp1Canvas.height;
+  const dpr = window.devicePixelRatio || 1;
+  const bgColor = '#0d1626', gridColor = 'rgba(255,255,255,0.06)', axisColor = 'rgba(255,255,255,0.35)';
+  const padL = 46*dpr, padR = 14*dpr, padT = 14*dpr, padB = 30*dpr;
+  const plotW = w - padL - padR, plotH = hgt - padT - padB;
+  pp1Ctx.fillStyle = bgColor;
+  pp1Ctx.fillRect(0,0,w,hgt);
+
+  const tMax = Math.max(N*h, 1e-9);
+  const exactPts = [];
+  const steps = 200;
+  for (let i=0;i<=steps;i++){ const t = tMax*i/steps; exactPts.push([t, Math.exp(lam*t)]); }
+  let maxAbs = 1;
+  exactPts.forEach(p => { if (isFinite(p[1]) && Math.abs(p[1]) > maxAbs) maxAbs = Math.abs(p[1]); });
+  ys.forEach(v => { if (isFinite(v) && Math.abs(v)*1.2 > maxAbs) maxAbs = Math.min(Math.abs(v)*1.2, maxAbs*50); });
+  const yCap = Math.max(maxAbs*1.15, 1.2);
+  const yMin = -yCap, yMax = yCap;
+
+  function toPx(t, y) {
+    const px = padL + (t/tMax)*plotW;
+    const py = padT + (1 - (y-yMin)/(yMax-yMin))*plotH;
+    return [px, py];
+  }
+  pp1Ctx.strokeStyle = gridColor;
+  pp1Ctx.lineWidth = 1*dpr;
+  pp1Ctx.font = (10*dpr)+'px sans-serif';
+  pp1Ctx.fillStyle = '#92a1bd';
+  for (let i=0;i<=4;i++){
+    const yVal = yMin + (yMax-yMin)*i/4;
+    const [,py] = toPx(0, yVal);
+    pp1Ctx.beginPath(); pp1Ctx.moveTo(padL, py); pp1Ctx.lineTo(w-padR, py); pp1Ctx.stroke();
+    pp1Ctx.fillText(fmtSmart(yVal), 4*dpr, py+3*dpr);
+  }
+  for (let i=0;i<=5;i++){
+    const tVal = tMax*i/5;
+    const [px] = toPx(tVal, 0);
+    pp1Ctx.beginPath(); pp1Ctx.moveTo(px, padT); pp1Ctx.lineTo(px, hgt-padB); pp1Ctx.stroke();
+    pp1Ctx.fillText(fmt(tVal,2), px-10*dpr, hgt-padB+16*dpr);
+  }
+  pp1Ctx.fillText('t', w-16*dpr, hgt-6*dpr);
+  pp1Ctx.strokeStyle = axisColor;
+  pp1Ctx.lineWidth = 1.5*dpr;
+  const [,zeroY] = toPx(0,0);
+  pp1Ctx.beginPath(); pp1Ctx.moveTo(padL, zeroY); pp1Ctx.lineTo(w-padR, zeroY); pp1Ctx.stroke();
+  pp1Ctx.beginPath(); pp1Ctx.moveTo(padL, padT); pp1Ctx.lineTo(padL, hgt-padB); pp1Ctx.stroke();
+
+  pp1Ctx.strokeStyle = '#92a1bd';
+  pp1Ctx.lineWidth = 2*dpr;
+  pp1Ctx.setLineDash([6*dpr, 4*dpr]);
+  pp1Ctx.beginPath();
+  exactPts.forEach((p,i) => {
+    const [px,py] = toPx(p[0], Math.max(yMin, Math.min(yMax, p[1])));
+    if (i===0) pp1Ctx.moveTo(px,py); else pp1Ctx.lineTo(px,py);
+  });
+  pp1Ctx.stroke();
+  pp1Ctx.setLineDash([]);
+
+  const ysShown = ys.slice(0, shownN + 1);
+  pp1Ctx.strokeStyle = '#3b82f6';
+  pp1Ctx.lineWidth = 2*dpr;
+  pp1Ctx.beginPath();
+  ysShown.forEach((y,n) => {
+    const t = n*h;
+    const [px,py] = toPx(t, Math.max(yMin, Math.min(yMax, y)));
+    if (n===0) pp1Ctx.moveTo(px,py); else pp1Ctx.lineTo(px,py);
+  });
+  pp1Ctx.stroke();
+  ysShown.forEach((y,n) => {
+    const t = n*h;
+    const [px,py] = toPx(t, Math.max(yMin, Math.min(yMax, y)));
+    const isLast = n === shownN && shownN < N;
+    pp1Ctx.beginPath(); pp1Ctx.arc(px, py, (isLast ? 4 : 2.5)*dpr, 0, 2*Math.PI);
+    pp1Ctx.fillStyle = '#3b82f6'; pp1Ctx.fill();
+  });
+}
+
+function pp1ResizeAndRedraw() { pp1ResizeCanvas(); pp1Draw(); }
+
+// Recompute the underlying series from whatever is currently in the method/λ/h
+// inputs and redraw the chart immediately, so the plot never goes stale while
+// the user is adjusting values (independent of the step-by-step "Solve" reveal).
+function pp1LiveRefreshChart() {
+  const method = pp1MethodSel.value;
+  const lam = parseFloat(pp1LambdaInput.value);
+  const h = parseFloat(pp1HInput.value);
+  if (!isFinite(lam) || !isFinite(h) || h <= 0) return;
+  const z = lam * h;
+  const R = cMethods[method].R(z);
+  const N = 10;
+  const ys = [1];
+  let y = 1;
+  for (let n = 1; n <= N; n++) { y = y * R; ys.push(y); }
+  pp1LastResult = { lam, h, N, ys };
+  pp1ResizeAndRedraw();
+}
+
+function pp1AnimateChart(onDone) {
+  if (!pp1LastResult) { if (onDone) onDone(); return; }
+  const N = pp1LastResult.N;
+  let n = 0;
+  const stepMs = 140;
+  function tick() {
+    pp1Draw(n);
+    if (n >= N) { if (onDone) onDone(); return; }
+    n++;
+    const t = setTimeout(tick, stepMs);
+    pp1Timers.push(t);
+  }
+  tick();
+}
+
+function pp1ShowStep(n, extraClass, delay) {
+  return new Promise(resolve => {
+    const t = setTimeout(() => {
+      const el = document.getElementById('pp1-step-' + n);
+      el.classList.add('show');
+      const card = el.querySelector('.step-card') || el.querySelector('.result-card');
+      if (card) {
+        if (extraClass) card.classList.add(extraClass);
+        card.classList.add('flash');
+        setTimeout(() => card.classList.remove('flash'), 900);
+      }
+      resolve();
+    }, delay);
+    pp1Timers.push(t);
+  });
+}
+
+function pp1PulseKv(id) {
+  const el = document.getElementById(id);
+  el.classList.remove('pulse');
+  void el.offsetWidth;
+  el.classList.add('pulse');
+}
+
+function pp1RevealFormulaLine(n, delay) {
+  const t = setTimeout(() => {
+    document.getElementById('pp1-fl-' + n).classList.add('show');
+  }, delay);
+  pp1Timers.push(t);
+}
+
+function pp1Solve() {
+  pp1Timers.forEach(t => clearTimeout(t));
+  pp1Timers = [];
+  document.querySelectorAll('#pp1-steps .solve-step').forEach(el => {
+    el.classList.remove('show');
+  });
+  document.querySelectorAll('#pp1-formula-block .formula-line').forEach(el => el.classList.remove('show'));
+  ['pp1-kv-z','pp1-kv-rz','pp1-kv-absrz','pp1-kv-method','pp1-kv-status'].forEach(id => {
+    document.getElementById(id).className = 'kv-chip' + (id === 'pp1-kv-method' || id === 'pp1-kv-status' ? '' : ' kv-blue');
+  });
+  pp1WhyPanel.classList.remove('show');
+  pp1WhyBtn.innerHTML = '❓ Why is it <span id="pp1-why-btn-word">unstable</span>?';
+
+  const method = pp1MethodSel.value;
+  const lam = parseFloat(pp1LambdaInput.value);
+  const h = parseFloat(pp1HInput.value);
+  if (!isFinite(lam) || !isFinite(h) || h <= 0) { alert('Please enter valid numbers for λ and h (h must be positive).'); return; }
+
+  const z = lam * h;
+  const R = cMethods[method].R(z);
+  const absR = Math.abs(R);
+  const tol = 1e-9;
+  const status = Math.abs(absR-1) < tol ? 'neutral' : (absR < 1 ? 'stable' : 'unstable');
+  const statusWord = status === 'stable' ? 'Stable' : (status === 'unstable' ? 'Unstable' : 'Neutral');
+  const rcClass = status === 'stable' ? 'ok' : (status === 'unstable' ? 'bad' : 'neutralrc');
+  const rcIcon = status === 'stable' ? '✔' : (status === 'unstable' ? '✖' : '●');
+  const kvClass = status === 'stable' ? 'kv-stable' : (status === 'unstable' ? 'kv-unstable' : 'kv-neutral');
+
+  // Step 1 — given values
+  document.getElementById('pp1-s1-text').textContent = 'λ = ' + fmtSmart(lam) + ',  h = ' + fmtSmart(h);
+  document.getElementById('pp1-s1-method').textContent = 'Method selected: ' + pp1Formulas[method].name;
+  document.getElementById('pp1-kv-method-val').textContent = pp1Formulas[method].name;
+
+  // Step 2 — z = hλ
+  document.getElementById('pp1-s2-text').textContent = 'z = hλ = ' + fmtSmart(h) + ' × (' + fmtSmart(lam) + ') = ' + fmtSmart(z);
+  document.getElementById('pp1-kv-z-val').textContent = fmtSmart(z);
+
+  // Step 3 — formula, line by line
+  const zs = fmtSmart(z);
+  const zsParen = z < 0 ? '(' + zs + ')' : zs;
+  document.getElementById('pp1-fl-0-expr').textContent = 'R(z)';
+  document.getElementById('pp1-fl-1-expr').textContent = pp1Formulas[method].formula.replace('R(z) = ', '');
+  document.getElementById('pp1-fl-2-expr').textContent = pp1Substituted(method, z).replace('R(z) = ', '');
+  document.getElementById('pp1-fl-3-expr').textContent = fmtSmart(R);
+
+  // Step 4 — |R(z)|
+  document.getElementById('pp1-s6-text').textContent = '|R(z)| = ' + fmtSmart(absR);
+
+  // Step 5 — result card
+  const rcCard = document.getElementById('pp1-result-card');
+  rcCard.className = 'result-card ' + rcClass;
+  document.getElementById('pp1-rc-icon').textContent = rcIcon;
+  document.getElementById('pp1-rc-word').textContent = statusWord;
+  document.getElementById('pp1-rc-condition').textContent = '|R(z)| = ' + fmtSmart(absR);
+  document.getElementById('pp1-rc-since').innerHTML =
+    status === 'stable' ? '|R(z)| &lt; 1' : status === 'unstable' ? '|R(z)| &gt; 1' : '|R(z)| = 1';
+  document.getElementById('pp1-rc-explain').textContent =
+    status === 'stable'   ? 'Errors decrease with every step. The numerical method is stable.' :
+    status === 'unstable' ? 'Errors grow rapidly. The numerical solution diverges.' :
+                             'Errors neither grow nor shrink — the method sits exactly on the stability boundary.';
+
+  // Why panel — generalized stability reasoning for the selected method
+  const meta = pp1Formulas[method];
+  pp1WhyBtn.dataset.status = status === 'stable' ? 'stable' : status === 'unstable' ? 'unstable' : 'neutral';
+  pp1WhyBtn.innerHTML = '❓ Why is it <span id="pp1-why-btn-word">' + pp1WhyBtn.dataset.status + '</span>?';
+  document.getElementById('pp1-why-title-label').textContent = meta.name + ' Stability Condition';
+  document.getElementById('pp1-why-condition').textContent = meta.cond;
+  document.getElementById('pp1-why-current').textContent = meta.condName + ' = ' + fmtSmart(absR);
+  document.getElementById('pp1-why-since').textContent =
+    fmtSmart(absR) + (status === 'stable' ? ' < 1' : status === 'unstable' ? ' > 1' : ' = 1');
+  document.getElementById('pp1-why-conclusion').textContent =
+    status === 'stable'   ? 'the solution stays bounded — the method is stable for this z.' :
+    status === 'unstable' ? 'the solution becomes unstable.' :
+                             'the method sits exactly on the edge of the stability region.';
+
+  // Update pinned key-value bar
+  document.getElementById('pp1-kv-rz-val').textContent = fmtSmart(R);
+  document.getElementById('pp1-kv-absrz-val').textContent = fmtSmart(absR);
+  document.getElementById('pp1-kv-status-val').textContent = statusWord;
+  document.getElementById('pp1-kv-status').classList.add(kvClass);
+  document.getElementById('pp1-kv-absrz').classList.add(kvClass);
+  ['pp1-kv-z','pp1-kv-rz','pp1-kv-absrz','pp1-kv-method','pp1-kv-status'].forEach(pp1PulseKv);
+
+  // Step 6 — iteration table with error-trend highlighting + plot data
+  const N = 10;
+  const ys = [1];
+  let y = 1;
+  for (let n=1; n<=N; n++){ y = y * R; ys.push(y); }
+  const tbody = document.getElementById('pp1-iter-table');
+  tbody.innerHTML = '';
+  let prevErr = null;
+  ys.forEach((yv, n) => {
+    const t = n*h;
+    const exactY = Math.exp(lam*t);
+    const err = Math.abs(yv - exactY);
+    const bigVal = Math.abs(yv) > 1e6;
+    let trendClass = '';
+    if (prevErr !== null && isFinite(err) && isFinite(prevErr)) {
+      trendClass = err > prevErr ? 'row-error-up' : (err < prevErr ? 'row-error-down' : '');
+    }
+    prevErr = err;
+    const tr = document.createElement('tr');
+    if (trendClass) tr.classList.add(trendClass);
+    tr.innerHTML = '<td>' + n + '</td><td>' + fmtSmart(exactY) + '</td>' +
+      '<td class="' + (bigVal ? 'row-diverge' : '') + '">' + fmtSmart(yv) + '</td>' +
+      '<td>' + fmtSmart(err) + '</td>';
+    tbody.appendChild(tr);
+  });
+  pp1LastResult = { lam, h, N, ys };
+
+  // Sequential reveal — 6 steps, formula lines animate within step 3
+  const stepDelay = 480;
+  pp1ShowStep(1, null, stepDelay*0);
+  pp1ShowStep(2, null, stepDelay*1);
+  const t3 = setTimeout(() => {
+    document.getElementById('pp1-step-3').classList.add('show');
+    pp1RevealFormulaLine(0, 0);
+    pp1RevealFormulaLine(1, 260);
+    pp1RevealFormulaLine(2, 520);
+    pp1RevealFormulaLine(3, 800);
+  }, stepDelay*2);
+  pp1Timers.push(t3);
+  pp1ShowStep(4, null, stepDelay*2 + 1100);
+  pp1ShowStep(5, rcClass === 'ok' ? 'ok' : (rcClass === 'bad' ? 'bad' : 'neutralrc'), stepDelay*3 + 1100);
+
+  const t6 = setTimeout(() => {
+    document.getElementById('pp1-step-6').classList.add('show');
+    pp1ResizeCanvas();
+    pp1AnimateChart(() => {
+      // Step 7 — learning summary, revealed once the chart finishes animating in
+      const finalErr = Math.abs(ys[N] - Math.exp(lam*(N*h)));
+      const relErr = Math.abs(Math.exp(lam*(N*h))) > 1e-9 ? finalErr / Math.abs(Math.exp(lam*(N*h))) : finalErr;
+      let errLabel;
+      if (status === 'unstable') errLabel = 'High (diverging)';
+      else if (relErr < 0.01) errLabel = 'Low';
+      else if (relErr < 0.15) errLabel = 'Moderate';
+      else errLabel = 'High';
+
+      let recLabel;
+      if (status === 'stable') {
+        recLabel = meta.name + ' (already a good fit)';
+      } else if (lam >= 0) {
+        recLabel = 'λ ≥ 0 — growth is expected here; compare against the exact solution instead of switching methods';
+      } else if (method === 'be' || method === 'trap') {
+        recLabel = 'Reduce h further';
+      } else {
+        recLabel = 'Backward Euler (unconditionally stable for Re(z) < 0)';
+      }
+
+      const sumCard = document.getElementById('pp1-summary-card');
+      sumCard.className = 'pp1-summary-card ' + (status === 'stable' ? 'ok' : status === 'unstable' ? 'bad' : '');
+      document.getElementById('pp1-sum-method').textContent = meta.name;
+      document.getElementById('pp1-sum-stable').textContent = statusWord;
+      document.getElementById('pp1-sum-error').textContent = errLabel;
+      document.getElementById('pp1-sum-rec').textContent = recLabel;
+      document.getElementById('pp1-step-7').classList.add('show');
+    });
+  }, stepDelay*4 + 1100);
+  pp1Timers.push(t6);
+}
+
+pp1SolveBtn.addEventListener('click', pp1Solve);
+
+/* ── Practice Problem 2 — interactive stiffness analysis ── */
+const pp2LamMaxInput = document.getElementById('pp2-lammax');
+const pp2LamMinInput = document.getElementById('pp2-lammin');
+const pp2AnalyzeBtn = document.getElementById('pp2-analyze-btn');
+let pp2Timers = [];
+
+const pp2AllMethods = {
+  fe:   { name: 'Forward Euler',  explicit: true },
+  be:   { name: 'Backward Euler', explicit: false },
+  trap: { name: 'Trapezoidal Rule', explicit: false }
+};
+
+const pp2Canvas = document.getElementById('pp2-chart');
+const pp2Ctx = pp2Canvas.getContext('2d');
+let pp2LastResult = null;
+
+function pp2ResizeCanvas() {
+  const rect = pp2Canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  pp2Canvas.width = rect.width * dpr;
+  pp2Canvas.height = rect.height * dpr;
+}
+
+function pp2Draw() {
+  if (!pp2LastResult) return;
+  const { lamMax, lamMin } = pp2LastResult;
+  const absMax = Math.abs(lamMax), absMin = Math.abs(lamMin);
+  const w = pp2Canvas.width, hgt = pp2Canvas.height;
+  const dpr = window.devicePixelRatio || 1;
+  const bgColor = '#0d1626', gridColor = 'rgba(255,255,255,0.06)', axisColor = 'rgba(255,255,255,0.35)';
+  const padL = 54*dpr, padR = 20*dpr, padT = 20*dpr, padB = 46*dpr;
+  const plotW = w - padL - padR, plotH = hgt - padT - padB;
+  pp2Ctx.fillStyle = bgColor;
+  pp2Ctx.fillRect(0,0,w,hgt);
+
+  // The practical consequence of stiffness: how many steps each method needs.
+  // Explicit (Forward Euler) is capped by its stability limit h <= 2/|lam_max|,
+  // and must hold that step for the whole run needed to see the slow mode decay
+  // (~5 time constants of lam_min). Implicit (Backward Euler) has no stability
+  // limit, so its step count is set by accuracy alone — independent of lam_max.
+  const hStabExplicit = 2 / absMax;
+  const tSim = 5 / absMin;
+  const stepsExplicit = Math.max(1, Math.ceil(tSim / hStabExplicit));
+  const stepsImplicit = 50;
+
+  const maxVal = Math.max(stepsExplicit, stepsImplicit, 10);
+  const logMax = Math.ceil(Math.log10(maxVal)) + 0.35;
+
+  function valToY(v) {
+    const lv = Math.log10(Math.max(v, 1));
+    return padT + (1 - lv / logMax) * plotH;
+  }
+
+  // Gridlines + labels at powers of ten
+  pp2Ctx.strokeStyle = gridColor;
+  pp2Ctx.lineWidth = 1*dpr;
+  pp2Ctx.font = (10*dpr)+'px sans-serif';
+  pp2Ctx.fillStyle = '#92a1bd';
+  pp2Ctx.textAlign = 'right';
+  const topPower = Math.ceil(logMax);
+  for (let p = 0; p <= topPower; p++) {
+    const v = Math.pow(10, p);
+    const y = valToY(v);
+    if (y < padT - 1 || y > hgt - padB + 1) continue;
+    pp2Ctx.beginPath(); pp2Ctx.moveTo(padL, y); pp2Ctx.lineTo(w-padR, y); pp2Ctx.stroke();
+    pp2Ctx.fillText(v >= 1000 ? fmt(v/1000,0)+'k' : String(v), padL - 8*dpr, y + 3*dpr);
+  }
+  pp2Ctx.save();
+  pp2Ctx.translate(14*dpr, padT + plotH/2);
+  pp2Ctx.rotate(-Math.PI/2);
+  pp2Ctx.textAlign = 'center';
+  pp2Ctx.fillText('steps needed (log scale)', 0, 0);
+  pp2Ctx.restore();
+  pp2Ctx.textAlign = 'left';
+
+  // Axes
+  pp2Ctx.strokeStyle = axisColor;
+  pp2Ctx.lineWidth = 1.5*dpr;
+  pp2Ctx.beginPath(); pp2Ctx.moveTo(padL, padT); pp2Ctx.lineTo(padL, hgt-padB); pp2Ctx.stroke();
+  pp2Ctx.beginPath(); pp2Ctx.moveTo(padL, hgt-padB); pp2Ctx.lineTo(w-padR, hgt-padB); pp2Ctx.stroke();
+
+  // Two bars
+  const barW = plotW * 0.22;
+  const gap = plotW * 0.18;
+  const totalW = barW*2 + gap;
+  const startX = padL + (plotW - totalW)/2;
+  const baseY = hgt - padB;
+
+  function drawBar(x, val, color, lines) {
+    const y = valToY(val);
+    pp2Ctx.fillStyle = color;
+    pp2Ctx.fillRect(x, y, barW, baseY - y);
+    pp2Ctx.fillStyle = '#e8edf5';
+    pp2Ctx.font = 'bold ' + (13*dpr) + 'px sans-serif';
+    pp2Ctx.textAlign = 'center';
+    pp2Ctx.fillText('≈ ' + fmtSmart(val), x + barW/2, y - 10*dpr);
+    pp2Ctx.fillStyle = '#92a1bd';
+    pp2Ctx.font = (10.5*dpr) + 'px sans-serif';
+    lines.forEach((line, i) => {
+      pp2Ctx.fillText(line, x + barW/2, baseY + (16 + i*13)*dpr);
+    });
+    pp2Ctx.textAlign = 'left';
+  }
+  drawBar(startX, stepsExplicit, '#d85a30', ['Explicit', '(Forward Euler)']);
+  drawBar(startX + barW + gap, stepsImplicit, '#3b82f6', ['Implicit', '(Backward Euler)']);
+}
+
+function pp2ResizeAndRedraw() { pp2ResizeCanvas(); pp2Draw(); pp2EigenResizeCanvas(); pp2EigenDraw(); }
+
+/* ── Eigenvalue complex-plane plot ── */
+const pp2EigenCanvas = document.getElementById('pp2-eigen-chart');
+const pp2EigenCtx = pp2EigenCanvas.getContext('2d');
+
+function pp2EigenResizeCanvas() {
+  const rect = pp2EigenCanvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  pp2EigenCanvas.width = rect.width * dpr;
+  pp2EigenCanvas.height = rect.height * dpr;
+}
+
+// Signed-log transform so points many orders of magnitude apart are both visible
+function pp2SymLog(v) { return Math.sign(v) * Math.log10(1 + Math.abs(v)); }
+
+function pp2EigenDraw() {
+  if (!pp2LastResult) return;
+  const { lamMax, lamMin } = pp2LastResult;
+  const w = pp2EigenCanvas.width, hgt = pp2EigenCanvas.height;
+  const dpr = window.devicePixelRatio || 1;
+  const bgColor = '#0d1626', gridColor = 'rgba(255,255,255,0.06)', axisColor = 'rgba(255,255,255,0.35)';
+  const padL = 20*dpr, padR = 20*dpr, padT = 16*dpr, padB = 22*dpr;
+  const plotW = w - padL - padR, plotH = hgt - padT - padB;
+  pp2EigenCtx.fillStyle = bgColor;
+  pp2EigenCtx.fillRect(0,0,w,hgt);
+
+  const bothVals = [lamMax, lamMin, 0];
+  const maxAbs = Math.max(...bothVals.map(v => Math.abs(pp2SymLog(v))), 1);
+  const xMin = -maxAbs*1.15, xMax = maxAbs*1.15;
+
+  function toPx(reVal, imVal) {
+    const px = padL + ((pp2SymLog(reVal) - xMin)/(xMax-xMin)) * plotW;
+    const py = padT + plotH/2 - imVal*0; // both eigenvalues are real → sit on the axis
+    return [px, py];
+  }
+
+  // Grid + real-axis ticks at -1000,-100,-10,-1,0
+  pp2EigenCtx.strokeStyle = gridColor;
+  pp2EigenCtx.lineWidth = 1*dpr;
+  pp2EigenCtx.font = (9.5*dpr)+'px sans-serif';
+  pp2EigenCtx.fillStyle = '#92a1bd';
+  pp2EigenCtx.textAlign = 'center';
+  [0,-1,-10,-100,-1000,-10000].forEach(tick => {
+    const [px] = toPx(tick, 0);
+    if (px < padL-1 || px > w-padR+1) return;
+    pp2EigenCtx.beginPath(); pp2EigenCtx.moveTo(px, padT); pp2EigenCtx.lineTo(px, hgt-padB); pp2EigenCtx.stroke();
+    pp2EigenCtx.fillText(tick === 0 ? '0' : tick.toString(), px, hgt-padB+14*dpr);
+  });
+
+  // Real axis (horizontal) and imaginary axis (vertical, through 0)
+  pp2EigenCtx.strokeStyle = axisColor;
+  pp2EigenCtx.lineWidth = 1.5*dpr;
+  const [, midY] = toPx(0,0);
+  pp2EigenCtx.beginPath(); pp2EigenCtx.moveTo(padL, midY); pp2EigenCtx.lineTo(w-padR, midY); pp2EigenCtx.stroke();
+  const [zeroPx] = toPx(0,0);
+  pp2EigenCtx.beginPath(); pp2EigenCtx.moveTo(zeroPx, padT); pp2EigenCtx.lineTo(zeroPx, hgt-padB); pp2EigenCtx.stroke();
+  pp2EigenCtx.textAlign = 'left';
+  pp2EigenCtx.fillText('Re(λ)', w-padR-30*dpr, midY-8*dpr);
+  pp2EigenCtx.fillText('Im(λ)', zeroPx+6*dpr, padT+10*dpr);
+
+  // Draw an X marker
+  function drawX(px, py, color, size) {
+    pp2EigenCtx.strokeStyle = color;
+    pp2EigenCtx.lineWidth = 3*dpr;
+    pp2EigenCtx.beginPath();
+    pp2EigenCtx.moveTo(px-size, py-size); pp2EigenCtx.lineTo(px+size, py+size);
+    pp2EigenCtx.moveTo(px-size, py+size); pp2EigenCtx.lineTo(px+size, py-size);
+    pp2EigenCtx.stroke();
+  }
+
+  const [maxPx, maxPy] = toPx(lamMax, 0);
+  const [minPx, minPy] = toPx(lamMin, 0);
+  drawX(maxPx, maxPy, '#d85a30', 7*dpr);
+  drawX(minPx, minPy, '#3b82f6', 7*dpr);
+
+  pp2EigenCtx.textAlign = 'center';
+  pp2EigenCtx.fillStyle = '#d85a30';
+  pp2EigenCtx.font = 'bold ' + (11*dpr) + 'px sans-serif';
+  pp2EigenCtx.fillText('λ_max = ' + fmtSmart(lamMax), maxPx, maxPy-14*dpr);
+  pp2EigenCtx.fillStyle = '#3b82f6';
+  pp2EigenCtx.fillText('λ_min = ' + fmtSmart(lamMin), minPx, minPy-14*dpr);
+  pp2EigenCtx.textAlign = 'left';
+}
+
+function pp2ShowStep(n, delay) {
+  const t = setTimeout(() => {
+    const el = document.getElementById('pp2-step-' + n);
+    el.classList.add('show');
+    const card = el.querySelector('.step-card');
+    if (card) {
+      card.classList.add('flash');
+      setTimeout(() => card.classList.remove('flash'), 900);
+    }
+  }, delay);
+  pp2Timers.push(t);
+}
+
+function pp2RevealFormulaLine(n, delay) {
+  const t = setTimeout(() => {
+    document.getElementById('pp2-fl-' + n).classList.add('show');
+  }, delay);
+  pp2Timers.push(t);
+}
+
+function pp2PulseKv(id) {
+  const el = document.getElementById(id);
+  el.classList.remove('pulse');
+  void el.offsetWidth;
+  el.classList.add('pulse');
+}
+
+function pp2BuildMethodChips(containerId, methods, icon) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  methods.forEach(key => {
+    const m = pp2AllMethods[key];
+    const chip = document.createElement('div');
+    chip.className = 'pp2-method-chip';
+    chip.innerHTML = '<span class="chip-icon">' + icon + '</span><span>' + m.name + '</span>';
+    container.appendChild(chip);
+  });
+}
+
+function pp2Analyze() {
+  pp2Timers.forEach(t => clearTimeout(t));
+  pp2Timers = [];
+  document.querySelectorAll('#pp2-steps .solve-step').forEach(el => {
+    el.classList.remove('show');
+  });
+  document.querySelectorAll('#pp2-formula-block .formula-line').forEach(el => el.classList.remove('show'));
+  document.getElementById('pp2-s4-card').className = 'step-card';
+  ['pp2-kv-ratio','pp2-kv-class','pp2-kv-rec','pp2-kv-avoid'].forEach(id => {
+    const base = id === 'pp2-kv-ratio' ? 'kv-chip kv-blue' : id === 'pp2-kv-rec' ? 'kv-chip kv-stable' : id === 'pp2-kv-avoid' ? 'kv-chip kv-unstable' : 'kv-chip';
+    document.getElementById(id).className = base;
+  });
+
+  const lamMax = parseFloat(pp2LamMaxInput.value);
+  const lamMin = parseFloat(pp2LamMinInput.value);
+  if (!isFinite(lamMax) || !isFinite(lamMin) || lamMin === 0) { alert('Please enter valid, non-zero eigenvalues.'); return; }
+
+  const absMax = Math.abs(lamMax);
+  const absMin = Math.abs(lamMin);
+  const S = absMax / absMin;
+
+  let cls, clsClass;
+  if (S < 10) { cls = 'NOT STIFF'; clsClass = 'non-stiff'; }
+  else if (S <= 1000) { cls = 'HIGHLY STIFF'; clsClass = 'moderate'; }
+  else { cls = 'EXTREMELY STIFF'; clsClass = 'stiff'; }
+
+  // 4-tier color scale for the gauge (Green<10, Yellow<100, Orange<1000, Red>=1000), on a log scale
+  let scaleColor, zoneIdx;
+  if (S < 10) { scaleColor = '#1d9e75'; zoneIdx = 1; }
+  else if (S < 100) { scaleColor = '#f59e0b'; zoneIdx = 2; }
+  else if (S < 1000) { scaleColor = '#e2711d'; zoneIdx = 3; }
+  else { scaleColor = '#d85a30'; zoneIdx = 4; }
+  const scalePct = Math.max(2, Math.min(100, (Math.log10(Math.max(S,1)) / 4) * 100));
+
+  // Step 1 — given values
+  document.getElementById('pp2-s1-text').textContent = 'λ_max = ' + fmtSmart(lamMax) + ',  λ_min = ' + fmtSmart(lamMin);
+
+  // Step 2 — formula line by line
+  document.getElementById('pp2-fl-2-expr').textContent = '|' + fmtSmart(lamMax) + '| / |' + fmtSmart(lamMin) + '|';
+  document.getElementById('pp2-fl-3-expr').textContent = fmtSmart(S);
+  document.getElementById('pp2-kv-ratio-val').textContent = fmtSmart(S);
+
+  // Step 3 — classify + gauge
+  const badge = document.getElementById('pp2-class-badge');
+  badge.textContent = cls;
+  badge.className = 'pp2-class-badge ' + clsClass;
+  document.getElementById('pp2-gauge-marker').style.left = scalePct + '%';
+  document.getElementById('pp2-gauge-marker').style.background = scaleColor;
+  document.getElementById('pp2-s4-card').classList.add(clsClass + '-card');
+  [1,2,3,4].forEach(i => {
+    document.getElementById('pp2-zone-' + i).classList.toggle('z-active', i === zoneIdx);
+  });
+  const clsLabel = S < 10 ? 'Not Stiff' : S <= 1000 ? 'Highly Stiff' : 'Extremely Stiff';
+  document.getElementById('pp2-kv-class-val').textContent = clsLabel;
+
+  const s5 =
+    S < 10 ? ('The fastest and slowest modes decay at similar rates (only ' + fmtSmart(S) + '× apart). Step size is set by accuracy, not stability.') :
+    S <= 1000 ? ('The fastest mode decays ' + fmtSmart(S) + '× faster than the slowest — a manageable separation of time scales.') :
+    ('The fastest mode decays ' + fmtSmart(S) + '× faster than the slowest — an extreme separation of time scales.');
+  document.getElementById('pp2-s5-text').textContent = s5;
+
+  pp2LastResult = { lamMax, lamMin };
+  const hStabExplicitNote = 2 / absMax;
+  const tSimNote = 5 / absMin;
+  const stepsExplicitNote = Math.max(1, Math.ceil(tSimNote / hStabExplicitNote));
+  document.getElementById('pp2-graph-note').textContent =
+    'To stay stable, an explicit method is capped at h ≈ ' + fmtSmart(hStabExplicitNote) + ' by λ_max — yet the run needs to continue to t ≈ ' + fmtSmart(tSimNote) + ' for the slow mode to decay. That forces roughly ' + fmtSmart(stepsExplicitNote) + ' steps. An implicit method isn\'t limited by λ_max, so it can cover the same run in about 50 steps, chosen for accuracy alone.';
+
+  // Step 5 — recommend / avoid lists
+  let recommend, avoid;
+  if (S < 10) { recommend = ['fe','trap','be']; avoid = []; }
+  else if (S <= 1000) { recommend = ['trap','be']; avoid = ['fe']; }
+  else { recommend = ['be','trap']; avoid = ['fe']; }
+  pp2BuildMethodChips('pp2-recommend-list', recommend, '✓');
+  pp2BuildMethodChips('pp2-avoid-list', avoid.length ? avoid : [], '✗');
+  if (!avoid.length) {
+    document.getElementById('pp2-avoid-list').innerHTML = '<p style="font-size:13px; color:var(--text-muted); margin:0;">None — every method here is a reasonable choice.</p>';
+  }
+  document.getElementById('pp2-kv-rec-val').textContent = pp2AllMethods[recommend[0]].name;
+  document.getElementById('pp2-kv-avoid-val').textContent = avoid.length ? pp2AllMethods[avoid[0]].name : 'None';
+
+  // Interpretation box — plain-language explanation tied to the ratio
+  const topMethodName = pp2AllMethods[recommend[0]].name;
+  let interpText;
+  if (S < 10) {
+    interpText = 'The problem is <b>not stiff</b>. Fast and slow modes decay at similar rates, so <b>' + topMethodName + '</b> works efficiently — no special treatment needed.';
+  } else if (S <= 1000) {
+    interpText = 'The problem is <b>highly stiff</b>. Explicit methods need small step sizes to stay stable. <b>' + topMethodName + '</b> (implicit, 2nd-order accurate) is recommended.';
+  } else {
+    interpText = 'The problem is <b>extremely stiff</b>. Explicit methods are impractical — the required step size is far too small. <b>' + topMethodName + '</b> (implicit, L-stable) is strongly recommended.';
+  }
+  document.getElementById('pp2-interp-text').innerHTML = 'Ratio ≈ ' + fmtSmart(S) + '. ' + interpText;
+
+  // Step 6 — why bullets + takeaway box
+  const whyList = document.getElementById('pp2-why-list');
+  if (S < 10) {
+    whyList.innerHTML = '<li>The stiffness ratio is small.</li><li>Explicit methods can take large, accurate steps safely.</li><li>Stability is not a binding constraint here.</li>';
+  } else if (S <= 1000) {
+    whyList.innerHTML = '<li>The stiffness ratio is moderate.</li><li>Explicit methods still work, but need smaller steps for stability.</li><li>Implicit methods stay efficient without that restriction.</li>';
+  } else {
+    whyList.innerHTML = '<li>The stiffness ratio is very large.</li><li>Explicit methods require extremely small step sizes.</li><li>Implicit methods remain stable for large step sizes.</li>';
+  }
+  document.getElementById('pp2-tk-class').textContent = clsLabel;
+  document.getElementById('pp2-tk-method').textContent = pp2AllMethods[recommend[0]].name;
+  document.getElementById('pp2-tk-reason').textContent =
+    S < 10 ? 'No severe time-scale separation — accuracy, not stability, sets the step size.' :
+    S <= 1000 ? 'Balances efficiency and safety across moderately separated time scales.' :
+    'Stable for large step sizes, regardless of the fastest mode.';
+
+  const stepDelay = 480;
+  pp2ShowStep(1, stepDelay*0);
+  const t2 = setTimeout(() => {
+    document.getElementById('pp2-step-2').classList.add('show');
+    pp2RevealFormulaLine(0, 0);
+    pp2RevealFormulaLine(1, 220);
+    pp2RevealFormulaLine(2, 440);
+    pp2RevealFormulaLine(3, 700);
+  }, stepDelay*1);
+  pp2Timers.push(t2);
+  pp2ShowStep(3, stepDelay*1 + 1000);
+  const t4 = setTimeout(() => {
+    document.getElementById('pp2-step-4').classList.add('show');
+    pp2ResizeAndRedraw();
+  }, stepDelay*2 + 1000);
+  pp2Timers.push(t4);
+  pp2ShowStep(5, stepDelay*3 + 1000);
+  pp2ShowStep(6, stepDelay*4 + 1000);
+}
+
+pp2AnalyzeBtn.addEventListener('click', pp2Analyze);
+
+// Recompute λ_max/λ_min from the current inputs and redraw both PP2 charts
+// shortly after typing pauses, so typing feels instant instead of triggering
+// a full canvas redraw on every single keystroke.
+let pp2LiveRefreshTimer = null;
+function pp2LiveRefreshCharts() {
+  clearTimeout(pp2LiveRefreshTimer);
+  pp2LiveRefreshTimer = setTimeout(() => {
+    const lamMax = parseFloat(pp2LamMaxInput.value);
+    const lamMin = parseFloat(pp2LamMinInput.value);
+    if (!isFinite(lamMax) || !isFinite(lamMin) || lamMin === 0) return;
+    pp2LastResult = { lamMax, lamMin };
+    pp2ResizeAndRedraw();
+  }, 120);
+}
+[pp2LamMaxInput, pp2LamMinInput].forEach(el => {
+  el.addEventListener('input', pp2LiveRefreshCharts);
+});
+
+compareBuildLegend();
+regionUpdate();
+compareUpdate();
+pp1Solve();
+</script>
+</body>
+</html>
